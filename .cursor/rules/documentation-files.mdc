@@ -1,0 +1,36 @@
+---
+description: Various markdown file conventions in the documentation directory
+globs: /_docs/*.md
+---
+
+# Rule: Project Documentation Files
+
+## Goal
+
+To guide an AI assistant in using the documentation to stay on task.
+This document will go over what each separate markdown file expected to be found in the `_docs` folder.
+
+### Tech Stack
+
+`tech-stack.md` is a markdown file that describes all the packages and toolkits to be used with this project.
+
+### Project Rules
+
+`project-rules.md` details how the project should be structured and managed.
+
+### User Flow
+
+`user-flow.md` details the model user interactions with the project.
+
+### Bug Tracker
+
+`bug-tracker.md` will contain bugs to be fixed in the future.
+
+### UI-UX rules
+
+`uiux-rules.md` contains information about the desired user interaction and visual themeing.
+
+## Generation
+
+The user will prompt for the generation of these said files from the PRD generation process.
+## Target Audience

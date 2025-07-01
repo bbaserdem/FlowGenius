@@ -155,8 +155,11 @@
       in
         pkgs.mkShell {
           packages = [
+            # Python packages
             virtualenv
             pkgs.uv
+            # External packages
+            pkgs.task-master-ai
           ];
 
           env = {

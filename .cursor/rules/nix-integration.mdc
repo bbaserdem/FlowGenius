@@ -1,0 +1,24 @@
+---
+description: Best practices for setting up local python environment in NixOS, integrated with uv package manager.
+globs: flake.nix, nix/*
+alwaysApply: false
+---
+
+# NixOS
+
+## Overview
+Make sure we can develop on NixOS, and still have our project run elsewhere.
+We will be using flakes, and the current shell will have direnv to automatically load our dev shell.
+We are using a framework called uv2nix; which integrates nix with uv to have python development workflow happen with uv,
+but uses nix in the background to handle dependencies.
+
+## Guidelines for writing to flake.nix
+1. inputs.nixpkgs should point to the unstable branch of nixpkgs.
+2. Only add non-python dependencies to nixpkgs, handle python dependencies with uv
+3. Avoid shell hooks that have output to avoid clutter when entering a dev shell.
+4. Keep all nix files, except `flake.nix` and `flake.lock`, in a directory named `nix` to reduce clutter.
+// 5. Use flake-utils to make flake.nix more readable
+
+## Guidelines for picking tech stack
+- Don't suggest packages and software that is known to be incompatible with NixOS.
+- State when a software I want to use is incompatible developing with NixOS.

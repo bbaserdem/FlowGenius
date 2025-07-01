@@ -1,0 +1,48 @@
+---
+description: Guide for generating and following checklists, to track changes.
+globs: _docs/checklist/**.md
+---
+
+# Checklist
+
+## Goal
+
+To track progress towards goals of each phase, and document the workflow.
+
+## Checklist conventions
+
+There will be one checklist per phase, named `<N>-checklist.md`.
+Each checklist of a phase consists of headers from the tasks of the corresponding phase.
+Whenever a major action towards a subtask is done by the code assistant,
+the code assistant should put a corresponding entry under the task header.
+This would look like the following;
+
+```/_docs/checklist/1-mdp.md
+## Task 1
+- [ ] Subtask 1
+- [ ] Subtask 2
+- [ ] Subtask 3
+```
+
+Radio buttons should be marked as done `[x]` when finished.
+## Process
+
+1.  Read current phase list from the corresponding md file.
+2.  Break the tasks and subtasks into actionable items
+3.  Mark them as done as you move down the list.
+
+## Target Audience
+
+Assume the primary reader of the PRD is a **junior developer**.
+Therefore, requirements should be explicit, unambiguous, and avoid jargon where possible.
+Provide enough detail for them to understand the feature's purpose and core logic.
+
+## Output
+
+*   **Format:** Markdown (`.md`)
+*   **Location:** `/_docs/checklist`
+*   **Filename:** `<N>-<feature>.md`
+
+## Final instructions
+
+1. Do NOT change the checklist documents after generation, unless prompted specifically by the developer.
