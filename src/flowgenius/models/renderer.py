@@ -237,10 +237,22 @@ class MarkdownRenderer:
             "",
             "## Getting Started",
             "",
-            f"1. Start with {self._format_link(f'units/{project.units[0].id}.md', project.units[0].title)}",
-            "2. Complete the learning objectives for each unit",
-            "3. Take notes in the `notes/` directory",
-            "4. Track your progress by updating unit status",
+        ])
+        
+        if project.units:
+            lines.extend([
+                f"1. Start with {self._format_link(f'units/{project.units[0].id}.md', project.units[0].title)}",
+                "2. Complete the learning objectives for each unit",
+                "3. Take notes in the `notes/` directory",
+                "4. Track your progress by updating unit status",
+            ])
+        else:
+            lines.extend([
+                "1. This project currently has no learning units",
+                "2. Add some units to get started with your learning journey",
+            ])
+        
+        lines.extend([
             "",
             "Happy learning! 🚀"
         ])
