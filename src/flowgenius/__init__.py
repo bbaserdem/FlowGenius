@@ -7,5 +7,5 @@ learning goals, saving everything as local Markdown files for long-term retentio
 
 from .cli.main import main
 
-__version__ = "0.1.0"
+__version__ = "0.5.15"
 __all__ = ["main"]

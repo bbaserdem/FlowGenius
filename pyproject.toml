@@ -1,6 +1,6 @@
 [project]
 name = "flowgenius"
-version = "0.1.0"
+version = "0.5.15"
 description = "AI-assisted learning assistant that eliminates research paralysis"
 readme = "README.md"
 authors = [

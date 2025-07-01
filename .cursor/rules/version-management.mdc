@@ -1,0 +1,72 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Version Management Strategy
+
+## **Task-Based Versioning System**
+
+FlowGenius uses a unique versioning strategy that directly reflects Taskmaster task completion progress:
+
+**Format: `0.{TASK_NUMBER}.{LAST_SUBTASK_COMPLETED}`**
+
+### **Examples:**
+- `0.5.15` - Last completed subtask Completed Task 5, all 15 subtasks done
+- `0.6.3` - Completed Task 6, up to subtask 3
+  In the case where some subtasks were marked completed out of order, do not bump to that version.
+  (Example: we were working on task 5 subtask 4 when we realized task 5 subtask 10 was already implemented.
+  When marking task 5 subtask 10 as completed, do not do a version bump to 0.5.10, keep at version 0.5.4)
+- `0.8.0` - Completed Task 8, no subtasks (or placeholder for task start)
+
+### **Version Update Triggers:**
+- ✅ **After completing a full task** - Update to `0.{TASK}.{MAX_SUBTASK}`
+- ✅ **After completing significant subtasks** - Update to `0.{TASK}.{CURRENT_SUBTASK}`
+- ✅ **When starting a new task** - Update to `0.{NEW_TASK}.0`
+
+### **Files to Update (ALL MUST BE KEPT IN SYNC):**
+1. **`pyproject.toml`** - Main project version
+2. **`tests/pyproject.toml`** - Test package version
+3. **`nix/hm.nix`** - Nix package version
+4. **`src/flowgenius/__init__.py`** - Python package version (`__version__`)
+
+### **Update Process:**
+```bash
+# 1. Complete task/subtask work
+# 2. Update ALL version files simultaneously:
+search_replace "version = \"0.X.Y\"" -> "version = \"0.TASK.SUBTASK\""
+search_replace "__version__ = \"0.X.Y\"" -> "__version__ = \"0.TASK.SUBTASK\""
+
+# 3. Commit with descriptive message:
+git commit -m "bump: v0.TASK.SUBTASK - completed Task N Subtask M"
+```
+
+### **Version Consistency Rules:**
+- **NEVER update versions partially** - all 4 files must be updated together
+- **ALWAYS reflect actual completion** - don't bump ahead of actual progress
+- **USE descriptive commit messages** that reference the completed work
+- **MAINTAIN chronological order** - versions should always increase
+
+### **Integration with Taskmaster:**
+- Version updates should happen **after** marking tasks/subtasks as `done`
+- Use Taskmaster task/subtask IDs to determine the correct version number
+- Document major milestones in commit messages (e.g., "Task 5 complete: MarkdownRenderer system")
+
+### **Examples of Good Version Management:**
+```bash
+# Completing Task 5, Subtask 6
+git commit -m "bump: v0.5.6 - completed directory structure setup"
+
+# Completing entire Task 5 
+git commit -m "bump: v0.5.15 - Task 5 complete: MarkdownRenderer system with all 15 subtasks"
+
+# Starting Task 6
+git commit -m "bump: v0.6.0 - starting Task 6: Progress Tracking implementation"
+```
+
+### **Benefits of This Strategy:**
+- **Direct correlation** between version and project progress
+- **Easy progress tracking** from version number alone
+- **Clear milestone identification** at task completion
+- **Consistent with development workflow** via Taskmaster
+- **Useful for stakeholders** to understand project status

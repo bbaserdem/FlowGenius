@@ -39,7 +39,7 @@ in {
       type = types.package;
       default = pkgs.python3Packages.buildPythonApplication {
         pname = "flowgenius";
-        version = "0.1.0";
+        version = "0.5.15";
         
         src = ../.;
         
