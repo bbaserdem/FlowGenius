@@ -48,8 +48,64 @@
         "dependencies": [
           3
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Develop Resource Curator Agent",
+            "description": "Create the Resource Curator Agent to generate and curate resources for each Unit.",
+            "dependencies": [],
+            "details": "Implement a class that fetches and stores at least one video link and one reading link for each Unit, ensuring compatibility with Obsidian.\n<info added on 2025-07-01T19:07:41.810Z>\n**Resource Curator Agent Implementation:**\n\n**Core ResourceCuratorAgent Class**: \n- Built following the same pattern as TopicScaffolderAgent\n- Uses OpenAI API with structured prompts for resource generation\n- Robust error handling with fallback systems\n- Validates minimum resource requirements (videos + readings)\n\n**ResourceRequest Model**: \n- Pydantic model for structured request handling\n- Configurable minimum requirements (videos, readings)\n- Maximum resource limits to prevent overwhelming users\n- Optional difficulty preference support\n\n**AI-Powered Resource Generation**:\n- Comprehensive system prompt for expert resource curation\n- Focuses on reputable sources and diverse learning styles\n- Generates realistic URLs and accurate time estimates\n- Includes detailed descriptions for each resource\n\n**Fallback Systems**: \n- Multiple fallback levels if AI generation fails\n- Separate fallback generators for videos and readings\n- Ensures minimum requirements are always met\n- Uses realistic default URLs (YouTube search, Wikipedia)\n\n**Integration Ready**:\n- Properly imported in agents/__init__.py\n- Compatible with existing LearningResource model\n- Follows established code patterns and documentation standards\n</info added on 2025-07-01T19:07:41.810Z>",
+            "status": "done",
+            "testStrategy": "Unit tests to verify resource fetching and storage functionality."
+          },
+          {
+            "id": 2,
+            "title": "Implement Obsidian Compatibility",
+            "description": "Ensure that the generated links are compatible with Obsidian markdown format.",
+            "dependencies": [
+              1
+            ],
+            "details": "Modify the Resource Curator Agent to format links correctly for Obsidian, including proper markdown syntax.",
+            "status": "done",
+            "testStrategy": "Integration tests to check link formatting and compatibility."
+          },
+          {
+            "id": 3,
+            "title": "Develop Engage Task Generator",
+            "description": "Create the Engage Task Generator to add concise tasks to each Unit.",
+            "dependencies": [],
+            "details": "Implement a function that generates a concise task for each Unit based on the resources provided.\n<info added on 2025-07-01T19:09:37.787Z>\n✅ SUBTASK 4.3 COMPLETED SUCCESSFULLY!\n\n**Engage Task Generator Agent Implementation:**\n\n✅ **Core EngageTaskGeneratorAgent Class**: \n- Built following established agent patterns with OpenAI integration\n- Higher creativity temperature (0.8) for more engaging task generation\n- Robust error handling with multiple fallback levels\n- Validates minimum task requirements\n\n✅ **TaskGenerationRequest Model**: \n- Pydantic model for structured request handling\n- Optional resources integration for context-aware task generation\n- Configurable task count and difficulty preferences\n- Focus on application toggle for practical vs theoretical tasks\n\n✅ **AI-Powered Task Generation**:\n- Expert system prompt for pedagogical task design\n- Comprehensive task type guidelines (reflection, practice, project, quiz, experiment)\n- Includes available resources in context for better task alignment\n- Focuses on active learning over passive consumption\n\n✅ **Multiple Fallback Systems**: \n- Template-based fallback tasks if AI provides insufficient tasks\n- Complete fallback system if AI generation fails entirely\n- Intelligent task type selection based on learning objectives\n- Always ensures minimum task requirements are met\n\n✅ **Utility Functions Created**:\n- **format_tasks_for_markdown()**: Formats tasks with emojis and proper markdown\n- **suggest_task_for_objectives()**: Non-AI task suggestion based on objective analysis\n- Supports different task types with appropriate visual indicators\n\n✅ **Task Type Intelligence**:\n- Analyzes learning objectives to suggest appropriate task types\n- Maps objective verbs to optimal task types (apply→project, analyze→reflection, etc.)\n- Provides context-aware fallbacks without AI dependency\n\n✅ **Integration Ready**:\n- Properly imported in agents/__init__.py\n- Compatible with existing EngageTask model\n- Ready for integration with Resource Curator Agent\n\nReady to move to Subtask 4.4 - Integration!\n</info added on 2025-07-01T19:09:37.787Z>",
+            "status": "done",
+            "testStrategy": "Unit tests to ensure task generation logic is correct."
+          },
+          {
+            "id": 4,
+            "title": "Integrate Resource and Task Generation",
+            "description": "Combine the Resource Curator Agent and Engage Task Generator into a cohesive module.",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "Ensure that both components work together seamlessly to populate each Unit with resources and tasks.\n<info added on 2025-07-01T19:11:13.340Z>\nIntegrated Content Generation Implementation:\n\n- ContentGeneratorAgent Class: Orchestrates both ResourceCuratorAgent and EngageTaskGeneratorAgent, manages OpenAI client and model configuration centrally, provides a unified interface for complete content generation, and handles the complete workflow from unit input to formatted output.\n- ContentGenerationRequest Model: Comprehensive request model with all generation parameters, configurable resource and task requirements, difficulty and focus preferences, and Obsidian link formatting options.\n- GeneratedContent Model: Complete result model with resources, tasks, and formatted outputs, success tracking and generation notes for debugging, ready-to-use formatted markdown content, and maintains full data for further processing.\n- Complete Workflow Integration: Step 1 - Generate resources using ResourceCuratorAgent, Step 2 - Generate engage tasks using EngageTaskGeneratorAgent with resource context, Step 3 - Format all content for markdown output. All steps include error handling and fallback mechanisms.\n- Multiple Usage Patterns: generate_complete_content() for full control content generation, populate_unit_with_content() for in-place unit population, batch_populate_units() for efficient batch processing, and simple utility functions for common use cases.\n- Factory Functions: create_content_generator() for easy agent creation with API key management, generate_unit_content_simple() for one-line content generation for simple use cases, handles OpenAI client initialization and error management.\n- Robust Error Handling: Graceful fallback if AI generation fails, uses suggest_task_for_objectives for task fallbacks, comprehensive error tracking in generation notes, never fails completely, always produces usable content.\n- Integration Ready: Properly imported in agents/__init__.py, all component agents working together seamlessly, ready for use in CLI commands and project generation, compatible with existing project structures.\n</info added on 2025-07-01T19:11:13.340Z>",
+            "status": "done",
+            "testStrategy": "Integration tests to verify the end-to-end functionality of resource and task generation."
+          },
+          {
+            "id": 5,
+            "title": "Document Code and Usage",
+            "description": "Create comprehensive documentation for the implemented functionality.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Document the code structure, usage instructions, and examples for both the Resource Curator Agent and Engage Task Generator.\n<info added on 2025-07-01T19:20:25.781Z>\nComprehensive documentation has been successfully created, including a full usage guide and module README for the agents. The documentation features real code examples, multiple usage patterns, error scenarios, and specific integration examples. Code quality documentation includes comprehensive docstrings, type hints, and user experience focus with progressive complexity and troubleshooting scenarios. The documentation structure is complete, ensuring all code is production-ready.\n</info added on 2025-07-01T19:20:25.781Z>",
+            "status": "done",
+            "testStrategy": "Review documentation for clarity and completeness."
+          }
+        ]
       },
       {
         "id": 5,
@@ -132,7 +188,7 @@
     ],
     "metadata": {
       "created": "2025-07-01T17:03:10.935Z",
-      "updated": "2025-07-01T18:55:01.649Z",
+      "updated": "2025-07-01T19:20:39.062Z",
       "description": "Tasks for master context"
     }
   }

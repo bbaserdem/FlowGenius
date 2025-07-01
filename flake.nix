@@ -154,38 +154,40 @@
         virtualenv = editablePythonSet.mkVirtualEnv "flowgenius-dev-env" workspace.deps.all;
       in
         pkgs.mkShell {
-          packages = [
-            # Python packages
-            virtualenv
-            pkgs.uv
-          ] ++ (with pkgs; [
-            # Unix utilities
-            coreutils # Basic file, shell and text manipulation utilities
-            findutils # Find, locate, and xargs commands
-            gnugrep # GNU grep, egrep and fgrep
-            gnused # GNU stream editor
-            ripgrep # Fast line-oriented search tool
-            fd # Simple, fast and user-friendly alternative to find
-            bat # Cat clone with syntax highlighting
-            eza # Modern replacement for ls
-            htop # Interactive process viewer
-            jq # Lightweight JSON processor
-            watch # Execute a program periodically
-            curl # Command line tool for transferring data
-            wget # Internet file retriever
-            tree # Display directories as trees
-            unzip # Unzip utility
-            zip # Zip utility
-            # External packages
-            task-master-ai
-          ]);
+          packages =
+            [
+              # Python packages
+              virtualenv
+              pkgs.uv
+            ]
+            ++ (with pkgs; [
+              # Unix utilities
+              coreutils # Basic file, shell and text manipulation utilities
+              findutils # Find, locate, and xargs commands
+              gnugrep # GNU grep, egrep and fgrep
+              gnused # GNU stream editor
+              ripgrep # Fast line-oriented search tool
+              fd # Simple, fast and user-friendly alternative to find
+              bat # Cat clone with syntax highlighting
+              eza # Modern replacement for ls
+              htop # Interactive process viewer
+              jq # Lightweight JSON processor
+              watch # Execute a program periodically
+              curl # Command line tool for transferring data
+              wget # Internet file retriever
+              tree # Display directories as trees
+              unzip # Unzip utility
+              zip # Zip utility
+              # External packages
+              task-master-ai
+            ]);
 
           env = {
             # Don't create venv using uv
             UV_NO_SYNC = "1";
 
             # Force uv to use Python interpreter from venv
-            UV_PYTHON = "${virtualenv}/bin/python";
+            UV_PYTHON = python.interpreter;
 
             # Prevent uv from downloading managed Python's
             UV_PYTHON_DOWNLOADS = "never";
