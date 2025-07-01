@@ -1,13 +1,21 @@
 [project]
 name = "flowgenius"
 version = "0.1.0"
-description = "Add your description here"
+description = "AI-assisted learning assistant that eliminates research paralysis"
 readme = "README.md"
 authors = [
     { name = "bbaserdem", email = "baserdemb@gmail.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "openai>=1.0.0",
+    "langchain-core>=0.3.0",
+    "click>=8.0.0",
+    "platformdirs>=4.0.0",
+    "pydantic-settings>=2.0.0",
+    "ruamel.yaml>=0.18.0",
+    "textual>=0.80.0",
+]
 
 [project.scripts]
 flowgenius = "flowgenius:main"
