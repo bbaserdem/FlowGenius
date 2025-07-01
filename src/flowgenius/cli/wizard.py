@@ -5,6 +5,7 @@ This module implements the interactive configuration wizard for FlowGenius.
 """
 
 from pathlib import Path
+from typing import Optional
 import click
 from ..models.config import (
     FlowGeniusConfig,

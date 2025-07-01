@@ -13,6 +13,7 @@ mcp.json
 .direnv/
 result
 result-*
+manual_test_output/
 
 # Python-generated files
 __pycache__/

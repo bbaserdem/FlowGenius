@@ -117,8 +117,171 @@
         "dependencies": [
           4
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "in-progress",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Analyze Existing Markdown Generation",
+            "description": "Review the existing markdown generation functionality in the ProjectGenerator class to determine if it meets the requirements for the new Renderer component.",
+            "dependencies": [],
+            "details": "Evaluate the current methods _write_toc_file(), _build_toc_content(), _write_unit_files(), and _build_unit_content() for completeness and efficiency.\n<info added on 2025-07-01T21:40:14.107Z>\n**SUBTASK 5.1 ANALYSIS COMPLETED**\n\n**Existing Markdown Generation in ProjectGenerator:**\n\n**✅ Current Functionality Working:**\n- `_write_project_files()` orchestrates all file writing\n- `_write_toc_file()` + `_build_toc_content()` generates complete toc.md with YAML frontmatter, unit table, project structure\n- `_write_unit_files()` + `_build_unit_content()` generates unit files with YAML frontmatter, learning objectives, prerequisites\n- `_write_readme_file()` generates README.md with quick start instructions\n- `_write_metadata_file()` generates project.json metadata\n- `_format_link()` properly handles obsidian vs markdown link styles via config\n- Directory structure creation (units/, resources/, notes/)\n- Integration with existing project models and configuration\n\n**❌ Current Limitations Found:**\n- Resources section in unit files are placeholders (`<!-- TODO: Add curated resources -->`)\n- Engage tasks section in unit files are placeholders (`<!-- TODO: Add engaging tasks -->`)\n- No integration with Resource Curator Agent output (Task 4)\n- No integration with Engage Task Generator output (Task 4)\n- No progress tracking capabilities\n- Rendering logic tightly coupled within ProjectGenerator class\n- No standalone renderer component for reuse\n\n**🎯 Task 5 Purpose Clarified:**\nTask 5 is NOT about creating basic markdown generation (already exists), but about:\n1. Creating a dedicated Renderer component (separation of concerns)\n2. Integrating with Resource Curator and Engage Task Generator outputs\n3. Replacing placeholder content with real curated resources and tasks\n4. Adding progress tracking capabilities\n5. Making renderer reusable beyond project creation\n\n**Next Steps:**\nMove to Subtask 5.2 - Design dedicated Renderer class that integrates with existing agents and enhances functionality.\n</info added on 2025-07-01T21:40:14.107Z>",
+            "status": "done",
+            "testStrategy": "Conduct code reviews and run existing unit tests to verify functionality."
+          },
+          {
+            "id": 2,
+            "title": "Design Renderer Class",
+            "description": "Create a dedicated Renderer class to encapsulate markdown rendering functionality, ensuring separation of concerns.",
+            "dependencies": [
+              1
+            ],
+            "details": "Outline the class structure and methods needed for the Renderer, including methods for generating toc.md and unitXX.md files.\n<info added on 2025-07-01T21:43:12.937Z>\n✅ **SUBTASK 5.2 DESIGN AND IMPLEMENTATION COMPLETED**\n\n**Created MarkdownRenderer Class (`src/flowgenius/models/renderer.py`):**\n\n**🎯 Key Design Features:**\n- **Separation of Concerns**: Dedicated rendering class separate from ProjectGenerator\n- **Integration Ready**: Accepts `GeneratedContent` from Resource Curator and Engage Task Generator\n- **Progress Tracking**: `update_unit_progress()` method for status updates in YAML frontmatter\n- **Configuration Support**: Uses FlowGeniusConfig for link style (obsidian vs markdown)\n- **Flexible Rendering**: Can render full projects or individual unit files\n\n**📋 Core Methods Implemented:**\n- `render_project_files()`: Main orchestrator with progress callback support\n- `render_unit_file()`: Single unit file rendering with optional generated content\n- `update_unit_progress()`: Updates existing unit file status and completion dates\n- `_build_toc_content()`: Enhanced TOC with content generation status and resource/task counts\n- `_build_unit_content()`: Enhanced unit files with integrated resources, tasks, and generation notes\n- `_write_readme_file()`: Professional README with quick start guide\n- `_format_link()`: Configurable link formatting (obsidian/markdown)\n\n**🔗 Enhanced Integration Features:**\n- **unit_content_map**: Maps unit IDs to GeneratedContent for resource/task integration\n- **Content Generation Metadata**: Tracks generation status, resource counts, task counts in YAML frontmatter\n- **Generation Notes**: Includes AI generation notes for debugging and transparency\n- **Real vs Placeholder Content**: Automatically uses generated content when available, falls back to placeholders\n\n**📊 Enhanced TOC Features:**\n- Extended unit table with Resources and Tasks columns\n- Content generation status tracking (X/Y units generated)\n- Progress indicators for each unit's content completeness\n\n**🚀 Ready for Integration:**\n- Exported in `models/__init__.py`\n- Compatible with existing project models\n- Ready to replace ProjectGenerator's embedded rendering logic\n- Supports both current workflow and enhanced content integration\n\n**Next Steps:**\nMove to Subtask 5.3 - Implement Link Style Handling (verify and test the _format_link method)\n</info added on 2025-07-01T21:43:12.937Z>",
+            "status": "done",
+            "testStrategy": "Implement unit tests for the Renderer class methods to ensure they function as expected."
+          },
+          {
+            "id": 3,
+            "title": "Implement Link Style Handling",
+            "description": "Ensure the Renderer class properly handles the link_style configuration for both Obsidian and standard Markdown formats.",
+            "dependencies": [
+              2
+            ],
+            "details": "Utilize the existing _format_link() method to format links according to the specified style.\n<info added on 2025-07-01T21:55:15.998Z>\n**Implementation & Testing Status:**\n\n**✅ Core Link Style Implementation:**\n- `_format_link()` method works correctly for both \"obsidian\" and \"markdown\" styles\n- Obsidian format: `[[path|title]]` \n- Markdown format: `[title](path)`\n- Maintains perfect consistency with existing ProjectGenerator implementation\n\n**✅ Comprehensive Test Coverage:**\n- All link style handling tests passing via `nix flake check`\n- Tests verify formatting with special characters\n- Tests confirm consistency between MarkdownRenderer and ProjectGenerator\n- Edge case handling validated (empty projects, missing fields)\n\n**✅ Integration Verification:**\n- Link formatting integrated throughout TOC generation\n- Unit file generation uses proper link formatting  \n- Prerequisites sections use correct link style\n- README generation maintains consistency\n\n**✅ Bug Fixes Applied:**\n- Fixed Pydantic validation errors in test fixtures\n- Fixed edge case handling for empty projects\n- Resolved IndexError when accessing units[0] on empty project\n\n**✅ All Tests Passing:**\n- `nix flake check` completed successfully \n- 77 tests passed, 1 skipped, 1 warning\n- Link style handling verified across all test scenarios\n- No test failures or errors\n\n**🚀 Ready for Next Phase:**\nSubtask 5.3 is complete. Link style handling is robust, tested, and ready for production use.\nMove to Subtask 5.4 - Generate Required Markdown Files (verification and integration testing)\n</info added on 2025-07-01T21:55:15.998Z>",
+            "status": "done",
+            "testStrategy": "Create tests that validate link formatting for both styles."
+          },
+          {
+            "id": 4,
+            "title": "Generate Required Markdown Files",
+            "description": "Implement functionality in the Renderer class to generate all necessary markdown files: toc.md, unitXX.md, and README.md.",
+            "dependencies": [
+              2
+            ],
+            "details": "Ensure that the Renderer can create these files in the appropriate project directories with the correct content.\n<info added on 2025-07-01T22:00:11.923Z>\n✅ **SUBTASK 5.4 MARKDOWN FILE GENERATION SUCCESSFULLY COMPLETED**\n\n**Implementation Status:**\n\n**✅ All Required Files Generated:**\n- `toc.md` - Complete table of contents with YAML frontmatter, unit table, and project structure\n- `unitXX.md` - Individual unit files with YAML frontmatter, objectives, resources, and tasks\n- `README.md` - Project quick start guide with proper link formatting\n- `project.json` - Complete project metadata in JSON format\n\n**✅ Core Generation Methods:**\n- `render_project_files()` - Main orchestrator with progress callback support\n- `_write_toc_file()` + `_build_toc_content()` - Enhanced TOC with content generation status\n- `_write_unit_files()` + `_build_unit_content()` - Unit files with integrated content\n- `_write_readme_file()` - Professional README with proper link formatting\n- `_write_metadata_file()` - JSON metadata export\n- `render_unit_file()` - Individual unit file rendering capability\n\n**✅ Content Integration Features:**\n- Generated content integration (resources, tasks, generation notes)\n- Fallback to placeholder content when generation data unavailable\n- Content generation metadata in YAML frontmatter\n- Resource and task counts in TOC unit table\n- Progress tracking and completion status\n\n**✅ Comprehensive Integration Tests:**\n- `test_complete_project_rendering_obsidian_style()` - Full project with Obsidian links\n- `test_complete_project_rendering_markdown_style()` - Full project with markdown links\n- `test_individual_unit_file_generation()` - Single unit file with generated content\n- `test_project_json_metadata_generation()` - JSON metadata structure validation\n- All integration tests verify file creation, content accuracy, and link style consistency\n\n**✅ All Tests Passing:**\n- `nix flake check` completed successfully\n- Integration tests validate end-to-end file generation workflow\n- Both link styles (Obsidian and markdown) thoroughly tested\n- Content generation integration verified\n- Edge cases and error handling validated\n\n**🚀 Production Ready:**\nMarkdownRenderer can now generate all required markdown files with proper content integration, link formatting, and comprehensive test coverage. Ready for integration with ProjectGenerator and CLI workflows.\n</info added on 2025-07-01T22:00:11.923Z>",
+            "status": "done",
+            "testStrategy": "Write integration tests to verify that all markdown files are generated correctly."
+          },
+          {
+            "id": 5,
+            "title": "Integrate Progress Tracking",
+            "description": "Add functionality to the Renderer class for tracking progress during markdown file generation.",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement a mechanism to log or report progress as files are being generated.\n<info added on 2025-07-01T22:04:28.255Z>\n✅ **SUBTASK 5.5 PROGRESS TRACKING INTEGRATION SUCCESSFULLY COMPLETED**\n\n**Enhanced Progress Tracking Implementation:**\n\n**✅ Granular Progress Reporting:**\n- Enhanced `render_project_files()` with detailed step-by-step progress\n- Individual unit file creation progress (e.g., \"Creating unit file unit-1 (1/2)...\")\n- Precise step counting: metadata (1) + toc (2) + individual units (3,4...) + readme (final)\n- Progress messages clearly indicate current operation and completion status\n\n**✅ New Progress Tracking Methods:**\n- `track_unit_progress()` - Track individual unit status updates with progress callbacks\n- `get_rendering_progress_info()` - Provide pre-rendering progress estimation\n- Support for completion date tracking and status transitions\n- Real-time progress feedback during unit status updates\n\n**✅ Progress Callback Enhancements:**\n- Consistent callback signature: `(message, current_step, total_steps)`\n- Descriptive messages for each operation type\n- Granular unit-by-unit progress during bulk operations\n- Status update confirmations with completion dates\n\n**✅ Edge Case Handling:**\n- Empty project progress tracking (3 steps instead of variable)\n- Graceful fallback messages for projects without units\n- Consistent behavior across TOC and README generation\n- IndexError prevention for all empty project scenarios\n\n**✅ Comprehensive Test Coverage:**\n- Enhanced `test_render_project_files_with_progress_callback()` with granular verification\n- `test_track_unit_progress()` - Individual unit progress tracking validation\n- `test_get_rendering_progress_info()` - Progress estimation accuracy\n- `test_progress_tracking_with_empty_project()` - Edge case coverage\n- All progress tracking tests verify callback accuracy and file operations\n\n**✅ All Tests Passing:**\n- `nix flake check` completed successfully\n- 84 tests passed, 1 skipped, 1 warning\n- Progress tracking verified across all scenarios\n- Edge cases and error handling validated\n\n**🚀 Production Ready:**\nThe MarkdownRenderer now provides comprehensive progress tracking with granular reporting, individual unit status management, and robust edge case handling. Ready for integration with CLI workflows and user interfaces requiring progress feedback.\n</info added on 2025-07-01T22:04:28.255Z>",
+            "status": "done",
+            "testStrategy": "Test the progress tracking feature to ensure it accurately reflects the generation process."
+          },
+          {
+            "id": 6,
+            "title": "Set Up Project Directory Structure",
+            "description": "Create the necessary directory structure for storing Markdown files within the project.",
+            "dependencies": [],
+            "details": "Use Python's os module to create directories for storing toc.md and unitXX.md files. Ensure the directories are created in the specified project paths.",
+            "status": "pending",
+            "testStrategy": "Verify that the directories are correctly created and accessible in the file system."
+          },
+          {
+            "id": 7,
+            "title": "Implement Markdown File Writing Functionality",
+            "description": "Develop functions to write content to toc.md and unitXX.md files using Python's file handling capabilities.",
+            "dependencies": [
+              6
+            ],
+            "details": "Create separate functions for writing toc.md and unitXX.md files. Use Python's open() function to handle file operations and ensure content is written in Markdown format.",
+            "status": "pending",
+            "testStrategy": "Test by writing sample content to the files and checking if the content is correctly formatted and saved."
+          },
+          {
+            "id": 8,
+            "title": "Develop Link Style Handling",
+            "description": "Implement logic to ensure that links within the Markdown files respect the specified link_style.",
+            "dependencies": [
+              7
+            ],
+            "details": "Add parameters to the file writing functions to accept a link_style argument. Implement conditional logic to format links according to the specified style (e.g., relative or absolute).",
+            "status": "pending",
+            "testStrategy": "Test with different link styles and verify that links in the Markdown files are formatted correctly."
+          },
+          {
+            "id": 9,
+            "title": "Integrate Renderer with Project Workflow",
+            "description": "Ensure the Renderer component is integrated into the project's workflow to automatically generate Markdown files as needed.",
+            "dependencies": [
+              8
+            ],
+            "details": "Modify the project workflow to call the Renderer component at appropriate stages. Ensure it generates the necessary Markdown files based on project data.",
+            "status": "pending",
+            "testStrategy": "Simulate project workflows and verify that Markdown files are generated correctly at each stage."
+          },
+          {
+            "id": 10,
+            "title": "Implement Error Handling and Logging",
+            "description": "Add error handling and logging to the Renderer component to manage file writing errors and track operations.",
+            "dependencies": [
+              9
+            ],
+            "details": "Use Python's try-except blocks to handle potential file I/O errors. Implement logging to record successful operations and any errors encountered.",
+            "status": "pending",
+            "testStrategy": "Induce errors (e.g., by using invalid paths) and verify that they are logged correctly. Check logs for successful operations."
+          },
+          {
+            "id": 11,
+            "title": "Set Up Project Directory Structure",
+            "description": "Create the necessary directory structure for storing Markdown files within the project.",
+            "dependencies": [],
+            "details": "Use Python's os module to create directories if they do not exist. Ensure that the directory paths are configurable and can be set according to project requirements.",
+            "status": "pending",
+            "testStrategy": "Verify that the directories are created correctly by checking their existence after running the setup script."
+          },
+          {
+            "id": 12,
+            "title": "Implement TOC Markdown File Writer",
+            "description": "Develop functionality to generate and write the table of contents (toc.md) file.",
+            "dependencies": [
+              11
+            ],
+            "details": "Create a Python function that constructs the content for toc.md based on project data. Use file handling to write this content to the appropriate directory. Ensure the function respects the specified link_style.",
+            "status": "pending",
+            "testStrategy": "Check the contents of toc.md to ensure it matches expected output and that links are formatted correctly."
+          },
+          {
+            "id": 13,
+            "title": "Develop Unit Markdown File Writer",
+            "description": "Create functionality to generate and write unitXX.md files for each project unit.",
+            "dependencies": [
+              11
+            ],
+            "details": "Implement a Python function that iterates over project units, generating content for each unitXX.md file. Use file handling to write these files to the correct directory, ensuring link_style is applied.",
+            "status": "pending",
+            "testStrategy": "Verify that each unitXX.md file is created with the correct content and link formatting."
+          },
+          {
+            "id": 14,
+            "title": "Integrate Link Style Configuration",
+            "description": "Ensure that the link_style configuration is applied consistently across all Markdown files.",
+            "dependencies": [
+              12,
+              13
+            ],
+            "details": "Modify the Markdown writing functions to accept a link_style parameter. Implement logic to apply this style to all links within the generated Markdown content.",
+            "status": "pending",
+            "testStrategy": "Test with different link_style configurations to ensure links in toc.md and unitXX.md are formatted as specified."
+          },
+          {
+            "id": 15,
+            "title": "Implement Renderer Component Interface",
+            "description": "Develop the interface for the Renderer component to manage the creation of Markdown files.",
+            "dependencies": [
+              12,
+              13,
+              14
+            ],
+            "details": "Design a Python class or module that encapsulates the functionality for writing toc.md and unitXX.md files. Ensure it provides a clear API for external components to trigger Markdown generation.",
+            "status": "pending",
+            "testStrategy": "Use unit tests to verify that the Renderer component correctly generates Markdown files when its methods are called."
+          }
+        ]
       },
       {
         "id": 6,
@@ -188,7 +351,7 @@
     ],
     "metadata": {
       "created": "2025-07-01T17:03:10.935Z",
-      "updated": "2025-07-01T19:20:39.062Z",
+      "updated": "2025-07-01T22:04:52.366Z",
       "description": "Tasks for master context"
     }
   }
