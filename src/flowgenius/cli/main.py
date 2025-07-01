@@ -6,6 +6,7 @@ This module defines the main CLI group and entry point for FlowGenius commands.
 
 import click
 from .wizard import wizard
+from .new import new, create
 
 
 @click.group()
@@ -22,6 +23,8 @@ def cli():
 
 # Register subcommands
 cli.add_command(wizard)
+cli.add_command(new)
+cli.add_command(create)
 
 
 def main():

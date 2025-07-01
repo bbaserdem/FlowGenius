@@ -4,7 +4,8 @@ AI-assisted learning assistant that eliminates research paralysis by transformin
 
 ## Description
 
-FlowGenius helps you break through the overwhelming choice paralysis that comes with learning something new. Instead of spending hours figuring out *what* to learn and *how* to begin, simply tell FlowGenius your learning goal and get:
+FlowGenius helps you break through the overwhelming choice paralysis that comes with learning something new.
+Instead of spending hours figuring out *what* to learn and *how* to begin, simply tell FlowGenius your learning goal and get:
 
 - 📚 **Structured Learning Units** with clear progression
 - 🔗 **Curated Resources** (videos, articles, papers) 
@@ -18,34 +19,18 @@ All content is saved locally as Markdown files, perfect for Obsidian integration
 
 ### 1. Installation & Setup
 
+This flake provides a `home-manager` module. For more info, see [`nix/README.md`](nix/README.md) 
+Alternatively, use your favourite package manager.
+
 ```bash
-# Install FlowGenius
-nix develop  # or your preferred method
+pip --user install flowgenius
 
 # Configure your environment
 flowgenius wizard
 
 # Create your first learning project
-flowgenius new "learn microtonal guitar theory"
+flowgenius new "Learn NixOS"
 ```
-
-### 2. Nix/Home Manager Setup (Recommended)
-
-Add to your `home.nix`:
-
-```nix
-{
-  imports = [ /path/to/flowgenius/nix/hm.nix ];
-  
-  programs.flowgenius = {
-    enable = true;
-    openaiKeyPath = "${config.home.homeDirectory}/.secrets/openai_api_key";
-    projectsRoot = "${config.home.homeDirectory}/Learning";
-  };
-}
-```
-
-See [`nix/README.md`](nix/README.md) for comprehensive Nix integration documentation.
 
 ## Usage
 

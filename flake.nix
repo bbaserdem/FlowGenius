@@ -158,9 +158,27 @@
             # Python packages
             virtualenv
             pkgs.uv
+          ] ++ (with pkgs; [
+            # Unix utilities
+            coreutils # Basic file, shell and text manipulation utilities
+            findutils # Find, locate, and xargs commands
+            gnugrep # GNU grep, egrep and fgrep
+            gnused # GNU stream editor
+            ripgrep # Fast line-oriented search tool
+            fd # Simple, fast and user-friendly alternative to find
+            bat # Cat clone with syntax highlighting
+            eza # Modern replacement for ls
+            htop # Interactive process viewer
+            jq # Lightweight JSON processor
+            watch # Execute a program periodically
+            curl # Command line tool for transferring data
+            wget # Internet file retriever
+            tree # Display directories as trees
+            unzip # Unzip utility
+            zip # Zip utility
             # External packages
-            pkgs.task-master-ai
-          ];
+            task-master-ai
+          ]);
 
           env = {
             # Don't create venv using uv
