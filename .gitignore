@@ -17,6 +17,7 @@ manual_test_output/
 
 # Python-generated files
 __pycache__/
+.pytest_cache/
 *.py[oc]
 build/
 dist/

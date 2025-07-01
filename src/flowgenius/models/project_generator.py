@@ -5,13 +5,13 @@ This module handles creating learning projects, including directory structure
 and markdown file generation.
 """
 
-import json
 from pathlib import Path
 from typing import Optional
 from openai import OpenAI
 
 from .config import FlowGeniusConfig
-from .project import LearningProject, LearningUnit
+from .project import LearningProject
+from .renderer import MarkdownRenderer
 from ..agents.topic_scaffolder import TopicScaffolderAgent, ScaffoldingRequest
 
 
@@ -20,12 +20,13 @@ class ProjectGenerator:
     Handles the complete process of generating learning projects.
     
     Creates project directories, generates learning structure via AI,
-    and writes markdown files.
+    and delegates markdown file generation to MarkdownRenderer.
     """
     
     def __init__(self, config: FlowGeniusConfig) -> None:
         self.config = config
         self._scaffolder: Optional[TopicScaffolderAgent] = None
+        self._renderer: Optional[MarkdownRenderer] = None
     
     @property
     def scaffolder(self) -> TopicScaffolderAgent:
@@ -36,6 +37,13 @@ class ProjectGenerator:
             client = OpenAI(api_key=api_key)
             self._scaffolder = TopicScaffolderAgent(client, self.config.default_model)
         return self._scaffolder
+    
+    @property
+    def renderer(self) -> MarkdownRenderer:
+        """Lazy load the markdown renderer."""
+        if self._renderer is None:
+            self._renderer = MarkdownRenderer(self.config)
+        return self._renderer
     
     def create_project(
         self, 
@@ -97,246 +105,7 @@ class ProjectGenerator:
         return project_dir
     
     def _write_project_files(self, project: LearningProject, project_dir: Path) -> None:
-        """Write all project files to the directory."""
-        # Write project metadata
-        self._write_metadata_file(project, project_dir)
-        
-        # Write table of contents
-        self._write_toc_file(project, project_dir)
-        
-        # Write individual unit files
-        self._write_unit_files(project, project_dir)
-        
-        # Write README
-        self._write_readme_file(project, project_dir)
+        """Write all project files to the directory using the MarkdownRenderer."""
+        self.renderer.render_project_files(project, project_dir)
     
-    def _write_metadata_file(self, project: LearningProject, project_dir: Path) -> None:
-        """Write project metadata as JSON."""
-        metadata_file = project_dir / "project.json"
-        
-        # Convert to dict for JSON serialization
-        metadata_dict = project.model_dump()
-        
-        with open(metadata_file, 'w') as f:
-            json.dump(metadata_dict, f, indent=2, default=str)
-    
-    def _write_toc_file(self, project: LearningProject, project_dir: Path) -> None:
-        """Write the table of contents markdown file."""
-        toc_file = project_dir / "toc.md"
-        
-        # Build the table of contents content
-        content = self._build_toc_content(project)
-        
-        toc_file.write_text(content)
-    
-    def _build_toc_content(self, project: LearningProject) -> str:
-        """Build the table of contents markdown content."""
-        lines = []
-        
-        # YAML frontmatter
-        lines.extend([
-            "---",
-            f"title: {project.title}",
-            f"topic: {project.metadata.topic}",
-            f"created: {project.metadata.created_at.isoformat()}",
-            f"project_id: {project.project_id}",
-        ])
-        
-        if project.metadata.motivation:
-            lines.append(f"motivation: {project.metadata.motivation}")
-        
-        if project.metadata.estimated_total_time:
-            lines.append(f"estimated_time: {project.metadata.estimated_total_time}")
-        
-        lines.extend([
-            "---",
-            "",
-            f"# {project.title}",
-            ""
-        ])
-        
-        if project.metadata.motivation:
-            lines.extend([
-                "## Why This Topic?",
-                f"{project.metadata.motivation}",
-                ""
-            ])
-        
-        # Learning units table
-        lines.extend([
-            "## Learning Units",
-            "",
-            "| Unit | Title | Duration | Status |",
-            "|------|-------|----------|--------|"
-        ])
-        
-        for unit in project.units:
-            unit_link = self._format_link(f"units/{unit.id}.md", unit.title)
-            duration = unit.estimated_duration or "TBD"
-            status = unit.status.title()
-            
-            lines.append(f"| {unit.id} | {unit_link} | {duration} | {status} |")
-        
-        lines.extend([
-            "",
-            "## Project Structure",
-            "",
-            "```",
-            f"{project.project_id}/",
-            "├── toc.md              # This file - project overview",
-            "├── README.md           # Quick start guide", 
-            "├── project.json        # Project metadata",
-            "├── units/              # Learning unit files",
-        ])
-        
-        for unit in project.units:
-            lines.append(f"│   ├── {unit.id}.md")
-        
-        lines.extend([
-            "├── resources/          # Additional learning materials",
-            "└── notes/              # Your personal notes and progress",
-            "```",
-            "",
-            "## Getting Started",
-            "",
-            f"1. Start with {self._format_link(f'units/{project.units[0].id}.md', project.units[0].title)}",
-            "2. Complete the learning objectives for each unit",
-            "3. Take notes in the `notes/` directory",
-            "4. Track your progress by updating unit status",
-            "",
-            "Happy learning! 🚀"
-        ])
-        
-        return "\n".join(lines)
-    
-    def _write_unit_files(self, project: LearningProject, project_dir: Path) -> None:
-        """Write individual unit markdown files."""
-        units_dir = project_dir / "units"
-        
-        for unit in project.units:
-            unit_file = units_dir / f"{unit.id}.md"
-            content = self._build_unit_content(unit, project)
-            unit_file.write_text(content)
-    
-    def _build_unit_content(self, unit: LearningUnit, project: LearningProject) -> str:
-        """Build the content for a unit markdown file."""
-        lines = []
-        
-        # YAML frontmatter
-        lines.extend([
-            "---",
-            f"title: {unit.title}",
-            f"unit_id: {unit.id}",
-            f"project: {project.title}",
-            f"status: {unit.status}",
-        ])
-        
-        if unit.estimated_duration:
-            lines.append(f"estimated_duration: {unit.estimated_duration}")
-        
-        if unit.prerequisites:
-            lines.append(f"prerequisites: {unit.prerequisites}")
-        
-        lines.extend([
-            "---",
-            "",
-            f"# {unit.title}",
-            "",
-            unit.description,
-            ""
-        ])
-        
-        # Learning objectives
-        lines.extend([
-            "## Learning Objectives",
-            "",
-            "By the end of this unit, you will be able to:",
-            ""
-        ])
-        
-        for objective in unit.learning_objectives:
-            lines.append(f"- {objective}")
-        
-        lines.append("")
-        
-        # Prerequisites (if any)
-        if unit.prerequisites:
-            lines.extend([
-                "## Prerequisites",
-                "",
-                "Before starting this unit, make sure you've completed:",
-                ""
-            ])
-            
-            for prereq in unit.prerequisites:
-                prereq_link = self._format_link(f"{prereq}.md", f"Unit {prereq}")
-                lines.append(f"- {prereq_link}")
-            
-            lines.append("")
-        
-        # Resources section (placeholder)
-        lines.extend([
-            "## Resources",
-            "",
-            "*Resources for this unit will be curated and added here.*",
-            "",
-            "<!-- TODO: Add curated resources -->",
-            ""
-        ])
-        
-        # Engaging tasks section (placeholder)
-        lines.extend([
-            "## Practice & Engagement",
-            "",
-            "*Engaging tasks and practice exercises will be added here.*",
-            "",
-            "<!-- TODO: Add engaging tasks -->",
-            ""
-        ])
-        
-        # Notes section
-        lines.extend([
-            "## Your Notes",
-            "",
-            "*Use this space for your personal notes, insights, and reflections.*",
-            "",
-            ""
-        ])
-        
-        return "\n".join(lines)
-    
-    def _write_readme_file(self, project: LearningProject, project_dir: Path) -> None:
-        """Write a README file for the project."""
-        readme_file = project_dir / "README.md"
-        
-        content = f"""# {project.title}
-
-{project.metadata.topic} learning project created with FlowGenius.
-
-## Quick Start
-
-1. 📖 **Read the overview**: Check out [`toc.md`](toc.md) for the complete learning plan
-2. 🚀 **Start learning**: Begin with [Unit 1]({self._format_link(f"units/{project.units[0].id}.md", project.units[0].title)})
-3. 📝 **Take notes**: Use the `notes/` directory for your thoughts and progress
-4. 🔄 **Track progress**: Update unit status as you complete them
-
-## Project Structure
-
-- `toc.md` - Complete project overview and table of contents
-- `units/` - Individual learning unit files  
-- `resources/` - Additional learning materials
-- `notes/` - Your personal notes and progress
-- `project.json` - Project metadata
-
----
-*Generated by FlowGenius - eliminating research paralysis through structured learning*
-"""
-        
-        readme_file.write_text(content)
-    
-    def _format_link(self, path: str, title: str) -> str:
-        """Format a link based on the configured link style."""
-        if self.config.link_style == "obsidian":
-            return f"[[{path}|{title}]]"
-        else:  # markdown
-            return f"[{title}]({path})" 
+ 

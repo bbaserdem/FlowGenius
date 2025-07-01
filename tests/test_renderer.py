@@ -274,42 +274,39 @@ class TestLinkStyleHandling:
         
         assert result == "[[units/unit-1.md|C++ & Python: A Comparison]]"
     
-    def test_link_formatting_consistency_with_project_generator(self) -> None:
-        """Test that link formatting is consistent with ProjectGenerator implementation."""
+    def test_project_generator_uses_markdown_renderer(self) -> None:
+        """Test that ProjectGenerator properly delegates rendering to MarkdownRenderer."""
         from flowgenius.models.project_generator import ProjectGenerator
         
-        # Test both configs
-        configs = [
-            FlowGeniusConfig(
-                openai_key_path=Path("/tmp/test"),
-                projects_root=Path("/tmp/projects"),
-                link_style="obsidian",
-                default_model="gpt-4o-mini"
-            ),
-            FlowGeniusConfig(
-                openai_key_path=Path("/tmp/test"),
-                projects_root=Path("/tmp/projects"),
-                link_style="markdown", 
-                default_model="gpt-4o-mini"
-            )
-        ]
+        # Test that ProjectGenerator has a renderer property that returns MarkdownRenderer
+        config = FlowGeniusConfig(
+            openai_key_path=Path("/tmp/test"),
+            projects_root=Path("/tmp/projects"),
+            link_style="obsidian",
+            default_model="gpt-4o-mini"
+        )
         
-        test_cases = [
-            ("units/unit-1.md", "Python Basics"),
-            ("toc.md", "Table of Contents"),
-            ("unit-advanced.md", "Advanced Topics")
-        ]
+        generator = ProjectGenerator(config)
         
-        for config in configs:
-            renderer = MarkdownRenderer(config)
-            generator = ProjectGenerator(config)
-            
-            for path, title in test_cases:
-                renderer_result = renderer._format_link(path, title)
-                generator_result = generator._format_link(path, title)
-                
-                assert renderer_result == generator_result, \
-                    f"Link formatting mismatch for {config.link_style}: {path}, {title}"
+        # Verify that the renderer property returns a MarkdownRenderer instance
+        assert hasattr(generator, 'renderer')
+        assert isinstance(generator.renderer, MarkdownRenderer)
+        
+        # Verify that the renderer uses the same config
+        assert generator.renderer.config == config
+        assert generator.renderer.config.link_style == "obsidian"
+        
+        # Test with markdown config too
+        markdown_config = FlowGeniusConfig(
+            openai_key_path=Path("/tmp/test"),
+            projects_root=Path("/tmp/projects"),
+            link_style="markdown",
+            default_model="gpt-4o-mini"
+        )
+        
+        markdown_generator = ProjectGenerator(markdown_config)
+        assert isinstance(markdown_generator.renderer, MarkdownRenderer)
+        assert markdown_generator.renderer.config.link_style == "markdown"
 
 
 class TestFileOperations:
@@ -532,6 +529,197 @@ Some content here.
             assert progress_calls[0] == ("Creating project metadata...", 1, 3)
             assert progress_calls[1] == ("Generating table of contents...", 2, 3)
             assert progress_calls[2] == ("Creating README file...", 3, 3)
+
+
+class TestDirectoryCreation:
+    """Test cases for directory creation and structure setup."""
+    
+    def test_ensure_project_directories_creates_structure(
+        self, 
+        obsidian_config: FlowGeniusConfig
+    ) -> None:
+        """Test that _ensure_project_directories creates the required directory structure."""
+        renderer = MarkdownRenderer(obsidian_config)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_dir = Path(temp_dir) / "test_project"
+            
+            # Ensure the project directory doesn't exist initially
+            assert not project_dir.exists()
+            
+            # Call the directory creation method
+            renderer._ensure_project_directories(project_dir)
+            
+            # Verify main directory was created
+            assert project_dir.exists()
+            assert project_dir.is_dir()
+            
+            # Verify required subdirectories were created
+            expected_subdirs = ["units", "resources", "notes"]
+            for subdir in expected_subdirs:
+                subdir_path = project_dir / subdir
+                assert subdir_path.exists(), f"Subdirectory '{subdir}' should exist"
+                assert subdir_path.is_dir(), f"Subdirectory '{subdir}' should be a directory"
+    
+    def test_ensure_project_directories_handles_existing_directories(
+        self, 
+        markdown_config: FlowGeniusConfig
+    ) -> None:
+        """Test that directory creation works when directories already exist."""
+        renderer = MarkdownRenderer(markdown_config)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_dir = Path(temp_dir) / "existing_project"
+            
+            # Pre-create the main directory and some subdirectories
+            project_dir.mkdir()
+            (project_dir / "units").mkdir()
+            
+            # Create a file in existing directory to ensure it's preserved
+            test_file = project_dir / "units" / "existing_file.md"
+            test_file.write_text("existing content")
+            
+            # Call directory creation (should not fail)
+            renderer._ensure_project_directories(project_dir)
+            
+            # Verify all subdirectories exist
+            expected_subdirs = ["units", "resources", "notes"]
+            for subdir in expected_subdirs:
+                subdir_path = project_dir / subdir
+                assert subdir_path.exists()
+                assert subdir_path.is_dir()
+            
+            # Verify existing file is preserved
+            assert test_file.exists()
+            assert test_file.read_text() == "existing content"
+    
+    def test_ensure_project_directories_error_handling(
+        self, 
+        obsidian_config: FlowGeniusConfig
+    ) -> None:
+        """Test error handling when directory creation fails."""
+        renderer = MarkdownRenderer(obsidian_config)
+        
+        # Try to create directory in an invalid location
+        # Note: This test might be system-dependent
+        invalid_path = Path("/dev/null/invalid_project")
+        
+        with pytest.raises(OSError) as exc_info:
+            renderer._ensure_project_directories(invalid_path)
+        
+        assert "Failed to create project directory structure" in str(exc_info.value)
+    
+    def test_render_project_files_creates_directories(
+        self,
+        markdown_config: FlowGeniusConfig,
+        sample_project: LearningProject
+    ) -> None:
+        """Test that render_project_files automatically creates directories."""
+        renderer = MarkdownRenderer(markdown_config)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_dir = Path(temp_dir) / "auto_created_project"
+            
+            # Ensure project directory doesn't exist initially
+            assert not project_dir.exists()
+            
+            # Render project files (should create directories automatically)
+            renderer.render_project_files(sample_project, project_dir)
+            
+            # Verify project directory and subdirectories were created
+            assert project_dir.exists()
+            assert project_dir.is_dir()
+            
+            expected_subdirs = ["units", "resources", "notes"]
+            for subdir in expected_subdirs:
+                subdir_path = project_dir / subdir
+                assert subdir_path.exists()
+                assert subdir_path.is_dir()
+            
+            # Verify files were created in correct locations
+            assert (project_dir / "project.json").exists()
+            assert (project_dir / "toc.md").exists()
+            assert (project_dir / "README.md").exists()
+            assert (project_dir / "units" / "unit-1.md").exists()
+            assert (project_dir / "units" / "unit-2.md").exists()
+    
+    def test_render_unit_file_creates_parent_directories(
+        self,
+        obsidian_config: FlowGeniusConfig,
+        sample_project: LearningProject
+    ) -> None:
+        """Test that render_unit_file creates parent directories."""
+        renderer = MarkdownRenderer(obsidian_config)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            unit_file_path = Path(temp_dir) / "new_project" / "units" / "standalone_unit.md"
+            
+            # Ensure parent directories don't exist initially
+            assert not unit_file_path.parent.exists()
+            assert not unit_file_path.parent.parent.exists()
+            
+            # Render unit file (should create parent directories)
+            renderer.render_unit_file(
+                sample_project.units[0], 
+                sample_project, 
+                unit_file_path
+            )
+            
+            # Verify parent directories were created
+            assert unit_file_path.parent.exists()
+            assert unit_file_path.parent.is_dir()
+            assert unit_file_path.exists()
+            assert unit_file_path.is_file()
+            
+            # Verify file content is correct
+            content = unit_file_path.read_text()
+            assert "# Introduction to Python" in content
+            assert "unit_id: unit-1" in content
+    
+    def test_track_unit_progress_creates_units_directory(
+        self,
+        markdown_config: FlowGeniusConfig
+    ) -> None:
+        """Test that track_unit_progress creates units directory if needed."""
+        renderer = MarkdownRenderer(markdown_config)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_dir = Path(temp_dir) / "progress_project"
+            
+            # Ensure project and units directories don't exist
+            assert not project_dir.exists()
+            
+            # First create a unit file in the units directory for a valid test
+            units_dir = project_dir / "units"
+            units_dir.mkdir(parents=True)
+            unit_file = units_dir / "test-unit.md"
+            unit_file.write_text("""---
+title: Test Unit
+unit_id: test-unit
+status: pending
+---
+
+# Test Unit
+""")
+            
+            # Test progress tracking (should work without creating new directories)
+            renderer.track_unit_progress(project_dir, "test-unit", "completed")
+            
+            # Verify the file was updated
+            content = unit_file.read_text()
+            assert "status: completed" in content
+            
+            # Test with a completely new project directory
+            new_project_dir = Path(temp_dir) / "new_progress_project"
+            assert not new_project_dir.exists()
+            
+            # Track progress should create directories but fail on missing file
+            with pytest.raises(FileNotFoundError):
+                renderer.track_unit_progress(new_project_dir, "missing-unit", "completed")
+            
+            # Verify that the units directory was created even though the file wasn't found
+            assert (new_project_dir / "units").exists()
+            assert (new_project_dir / "units").is_dir()
 
 
 class TestErrorHandling:

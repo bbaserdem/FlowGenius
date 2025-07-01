@@ -52,6 +52,9 @@ class MarkdownRenderer:
             unit_content_map: Optional mapping of unit IDs to generated content
             progress_callback: Optional callback for progress updates (message, current, total)
         """
+        # Ensure project directory structure exists
+        self._ensure_project_directories(project_dir)
+        
         # Calculate total steps (metadata, toc, readme + individual units)
         total_steps = 3 + len(project.units)  # metadata, toc, readme + each unit
         current_step = 0
@@ -101,6 +104,9 @@ class MarkdownRenderer:
             output_path: Where to save the unit file
             generated_content: Optional curated resources and tasks
         """
+        # Ensure parent directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
         content = self._build_unit_content(unit, project, generated_content)
         output_path.write_text(content)
     
@@ -460,6 +466,33 @@ class MarkdownRenderer:
         else:  # markdown
             return f"[{title}]({path})"
     
+    def _ensure_project_directories(self, project_dir: Path) -> None:
+        """
+        Ensure that the necessary project directory structure exists.
+        
+        Creates the main project directory and required subdirectories:
+        - units/ for learning unit markdown files
+        - resources/ for additional learning materials  
+        - notes/ for user notes and progress tracking
+        
+        Args:
+            project_dir: Path to the project directory
+            
+        Raises:
+            OSError: If directory creation fails due to permissions or other issues
+        """
+        try:
+            # Create main project directory
+            project_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Create required subdirectories
+            subdirectories = ["units", "resources", "notes"]
+            for subdir in subdirectories:
+                (project_dir / subdir).mkdir(exist_ok=True)
+                
+        except OSError as e:
+            raise OSError(f"Failed to create project directory structure at {project_dir}: {e}") from e
+    
     def track_unit_progress(
         self,
         project_dir: Path,
@@ -478,7 +511,11 @@ class MarkdownRenderer:
             completion_date: Optional completion timestamp
             progress_callback: Optional callback for progress updates
         """
-        unit_file_path = project_dir / "units" / f"{unit_id}.md"
+        # Ensure units directory exists
+        units_dir = project_dir / "units"
+        units_dir.mkdir(parents=True, exist_ok=True)
+        
+        unit_file_path = units_dir / f"{unit_id}.md"
         
         if progress_callback:
             progress_callback(f"Updating progress for unit {unit_id}...", 1, 1)
