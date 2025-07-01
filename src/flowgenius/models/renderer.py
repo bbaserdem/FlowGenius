@@ -422,6 +422,12 @@ class MarkdownRenderer:
         """Write a README file for the project."""
         readme_file = project_dir / "README.md"
         
+        # Handle empty projects gracefully
+        if project.units:
+            start_instruction = f"2. 🚀 **Start learning**: Begin with {self._format_link(f'units/{project.units[0].id}.md', project.units[0].title)}"
+        else:
+            start_instruction = "2. 📋 **Add units**: This project needs learning units to get started"
+        
         content = f"""# {project.title}
 
 {project.metadata.topic} learning project created with FlowGenius.
@@ -429,7 +435,7 @@ class MarkdownRenderer:
 ## Quick Start
 
 1. 📖 **Read the overview**: Check out [`toc.md`](toc.md) for the complete learning plan
-2. 🚀 **Start learning**: Begin with [Unit 1]({self._format_link(f"units/{project.units[0].id}.md", project.units[0].title)})
+{start_instruction}
 3. 📝 **Take notes**: Use the `notes/` directory for your thoughts and progress
 4. 🔄 **Track progress**: Update unit status as you complete them
 
