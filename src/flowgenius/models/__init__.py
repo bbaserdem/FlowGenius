@@ -12,6 +12,7 @@ from .project import (
     generate_project_id, generate_unit_id
 )
 from .project_generator import ProjectGenerator
+from .renderer import MarkdownRenderer
 
 __all__ = [
     # Configuration
@@ -31,5 +32,6 @@ __all__ = [
     "generate_unit_id",
     
     # Project generation
-    "ProjectGenerator"
+    "ProjectGenerator",
+    "MarkdownRenderer"
 ] 
