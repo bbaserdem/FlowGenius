@@ -25,7 +25,7 @@ from flowgenius.agents import (
 )
 
 
-def run_basic_functionality_test():
+def run_basic_functionality_test() -> bool:
     """Test basic functionality with fallback systems."""
     print("🧪 Testing Basic Functionality...")
     
@@ -74,7 +74,7 @@ def run_basic_functionality_test():
         return False
 
 
-def run_individual_agents_test():
+def run_individual_agents_test() -> bool:
     """Test individual agents separately."""
     print("\n🧪 Testing Individual Agents...")
     
@@ -122,7 +122,7 @@ def run_individual_agents_test():
         return False
 
 
-def run_with_api_key_test():
+def run_with_api_key_test() -> bool:
     """Test with API key if available."""
     api_key = os.getenv('OPENAI_API_KEY')
     
@@ -169,7 +169,7 @@ def run_with_api_key_test():
         return False
 
 
-def run_error_handling_test():
+def run_error_handling_test() -> bool:
     """Test error handling scenarios."""
     print("\n🧪 Testing Error Handling...")
     
@@ -207,7 +207,7 @@ def run_error_handling_test():
         return False
 
 
-def main():
+def main() -> bool:
     """Run all tests."""
     print("🚀 FlowGenius Agent Manual Testing")
     print("=" * 50)

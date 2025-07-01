@@ -11,7 +11,7 @@ from typing import Optional
 from openai import OpenAI
 
 from .config import FlowGeniusConfig
-from .project import LearningProject
+from .project import LearningProject, LearningUnit
 from ..agents.topic_scaffolder import TopicScaffolderAgent, ScaffoldingRequest
 
 
@@ -23,7 +23,7 @@ class ProjectGenerator:
     and writes markdown files.
     """
     
-    def __init__(self, config: FlowGeniusConfig):
+    def __init__(self, config: FlowGeniusConfig) -> None:
         self.config = config
         self._scaffolder: Optional[TopicScaffolderAgent] = None
     
@@ -96,7 +96,7 @@ class ProjectGenerator:
         
         return project_dir
     
-    def _write_project_files(self, project: LearningProject, project_dir: Path):
+    def _write_project_files(self, project: LearningProject, project_dir: Path) -> None:
         """Write all project files to the directory."""
         # Write project metadata
         self._write_metadata_file(project, project_dir)
@@ -110,7 +110,7 @@ class ProjectGenerator:
         # Write README
         self._write_readme_file(project, project_dir)
     
-    def _write_metadata_file(self, project: LearningProject, project_dir: Path):
+    def _write_metadata_file(self, project: LearningProject, project_dir: Path) -> None:
         """Write project metadata as JSON."""
         metadata_file = project_dir / "project.json"
         
@@ -120,7 +120,7 @@ class ProjectGenerator:
         with open(metadata_file, 'w') as f:
             json.dump(metadata_dict, f, indent=2, default=str)
     
-    def _write_toc_file(self, project: LearningProject, project_dir: Path):
+    def _write_toc_file(self, project: LearningProject, project_dir: Path) -> None:
         """Write the table of contents markdown file."""
         toc_file = project_dir / "toc.md"
         
@@ -209,7 +209,7 @@ class ProjectGenerator:
         
         return "\n".join(lines)
     
-    def _write_unit_files(self, project: LearningProject, project_dir: Path):
+    def _write_unit_files(self, project: LearningProject, project_dir: Path) -> None:
         """Write individual unit markdown files."""
         units_dir = project_dir / "units"
         
@@ -218,7 +218,7 @@ class ProjectGenerator:
             content = self._build_unit_content(unit, project)
             unit_file.write_text(content)
     
-    def _build_unit_content(self, unit, project: LearningProject) -> str:
+    def _build_unit_content(self, unit: LearningUnit, project: LearningProject) -> str:
         """Build the content for a unit markdown file."""
         lines = []
         
@@ -305,7 +305,7 @@ class ProjectGenerator:
         
         return "\n".join(lines)
     
-    def _write_readme_file(self, project: LearningProject, project_dir: Path):
+    def _write_readme_file(self, project: LearningProject, project_dir: Path) -> None:
         """Write a README file for the project."""
         readme_file = project_dir / "README.md"
         

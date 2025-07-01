@@ -4,6 +4,7 @@ Tests for the Content Generator integration agent.
 
 import json
 import pytest
+from typing import Any
 from unittest.mock import Mock, patch, MagicMock
 
 from flowgenius.agents.content_generator import (
@@ -20,7 +21,7 @@ from flowgenius.agents.engage_task_generator import EngageTaskGeneratorAgent
 class TestContentGeneratorAgent:
     """Test cases for ContentGeneratorAgent."""
 
-    def test_init(self, mock_openai_client):
+    def test_init(self, mock_openai_client: Mock) -> None:
         """Test agent initialization."""
         agent = ContentGeneratorAgent(mock_openai_client)
         
@@ -29,7 +30,7 @@ class TestContentGeneratorAgent:
         assert isinstance(agent.resource_curator, ResourceCuratorAgent)
         assert isinstance(agent.task_generator, EngageTaskGeneratorAgent)
 
-    def test_generate_complete_content_success(self, mock_openai_client, sample_learning_unit, sample_learning_resources, sample_engage_tasks):
+    def test_generate_complete_content_success(self, mock_openai_client: Mock, sample_learning_unit: Any, sample_learning_resources: Any, sample_engage_tasks: Any) -> None:
         """Test successful complete content generation."""
         agent = ContentGeneratorAgent(mock_openai_client)
         
@@ -52,7 +53,7 @@ class TestContentGeneratorAgent:
             assert len(content.formatted_tasks) == 2
             assert len(content.generation_notes) == 2
 
-    def test_generate_complete_content_with_custom_request(self, mock_openai_client, sample_learning_unit):
+    def test_generate_complete_content_with_custom_request(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test content generation with custom request parameters."""
         agent = ContentGeneratorAgent(mock_openai_client)
         
@@ -89,7 +90,7 @@ class TestContentGeneratorAgent:
             assert task_request.difficulty_preference == "advanced"
             assert task_request.focus_on_application is False
 
-    def test_generate_complete_content_failure(self, mock_openai_client, sample_learning_unit):
+    def test_generate_complete_content_failure(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test content generation when component agents fail."""
         agent = ContentGeneratorAgent(mock_openai_client)
         
@@ -110,7 +111,7 @@ class TestContentGeneratorAgent:
             assert len(content.resources) >= 2  # Fallback resources
             assert len(content.engage_tasks) >= 1  # Fallback task
 
-    def test_populate_unit_with_content(self, mock_openai_client, sample_learning_unit, sample_learning_resources, sample_engage_tasks):
+    def test_populate_unit_with_content(self, mock_openai_client: Mock, sample_learning_unit: Any, sample_learning_resources: Any, sample_engage_tasks: Any) -> None:
         """Test in-place unit population."""
         agent = ContentGeneratorAgent(mock_openai_client)
         
@@ -136,7 +137,7 @@ class TestContentGeneratorAgent:
             assert len(result_unit.resources) == 2
             assert len(result_unit.engage_tasks) == 2
 
-    def test_populate_unit_with_content_custom_request(self, mock_openai_client, sample_learning_unit):
+    def test_populate_unit_with_content_custom_request(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test unit population with custom request."""
         agent = ContentGeneratorAgent(mock_openai_client)
         
@@ -163,7 +164,7 @@ class TestContentGeneratorAgent:
             assert actual_request.unit == sample_learning_unit
             assert actual_request.num_engage_tasks == 5
 
-    def test_batch_populate_units(self, mock_openai_client, sample_learning_unit, sample_learning_resources, sample_engage_tasks):
+    def test_batch_populate_units(self, mock_openai_client: Mock, sample_learning_unit: Any, sample_learning_resources: Any, sample_engage_tasks: Any) -> None:
         """Test batch unit population."""
         agent = ContentGeneratorAgent(mock_openai_client)
         
@@ -200,7 +201,7 @@ class TestContentGeneratorAgent:
                 assert len(unit.resources) == 1
                 assert len(unit.engage_tasks) == 1
 
-    def test_batch_populate_units_with_base_request(self, mock_openai_client, sample_learning_unit):
+    def test_batch_populate_units_with_base_request(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test batch population with base request."""
         agent = ContentGeneratorAgent(mock_openai_client)
         
@@ -229,7 +230,7 @@ class TestContentGeneratorAgent:
             assert actual_request.difficulty_preference == "expert"
             assert actual_request.unit == sample_learning_unit
 
-    def test_format_resources(self, mock_openai_client, sample_learning_resources):
+    def test_format_resources(self, mock_openai_client: Mock, sample_learning_resources: Any) -> None:
         """Test resource formatting."""
         agent = ContentGeneratorAgent(mock_openai_client)
         
@@ -239,7 +240,7 @@ class TestContentGeneratorAgent:
         assert "🎥" in formatted[0]
         assert "📖" in formatted[1]
 
-    def test_format_tasks(self, mock_openai_client, sample_engage_tasks):
+    def test_format_tasks(self, mock_openai_client: Mock, sample_engage_tasks: Any) -> None:
         """Test task formatting."""
         agent = ContentGeneratorAgent(mock_openai_client)
         
@@ -249,7 +250,7 @@ class TestContentGeneratorAgent:
         assert "🛠️" in formatted[0]
         assert "🤔" in formatted[1]
 
-    def test_generate_fallback_content(self, mock_openai_client, sample_learning_unit):
+    def test_generate_fallback_content(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test fallback content generation."""
         agent = ContentGeneratorAgent(mock_openai_client)
         request = ContentGenerationRequest(unit=sample_learning_unit)
@@ -270,7 +271,7 @@ class TestContentGeneratorAgent:
 class TestContentGenerationRequest:
     """Test cases for ContentGenerationRequest model."""
 
-    def test_content_generation_request_defaults(self, sample_learning_unit):
+    def test_content_generation_request_defaults(self, sample_learning_unit: Any) -> None:
         """Test ContentGenerationRequest with default values."""
         request = ContentGenerationRequest(unit=sample_learning_unit)
         
@@ -283,7 +284,7 @@ class TestContentGenerationRequest:
         assert request.focus_on_application is True
         assert request.use_obsidian_links is True
 
-    def test_content_generation_request_custom_values(self, sample_learning_unit):
+    def test_content_generation_request_custom_values(self, sample_learning_unit: Any) -> None:
         """Test ContentGenerationRequest with custom values."""
         request = ContentGenerationRequest(
             unit=sample_learning_unit,
@@ -308,7 +309,7 @@ class TestContentGenerationRequest:
 class TestGeneratedContent:
     """Test cases for GeneratedContent model."""
 
-    def test_generated_content_creation(self, sample_learning_resources, sample_engage_tasks):
+    def test_generated_content_creation(self, sample_learning_resources: Any, sample_engage_tasks: Any) -> None:
         """Test GeneratedContent model creation."""
         content = GeneratedContent(
             unit_id="unit-1",
@@ -326,7 +327,7 @@ class TestGeneratedContent:
         assert content.generation_success is True
         assert len(content.generation_notes) == 2
 
-    def test_generated_content_defaults(self):
+    def test_generated_content_defaults(self) -> None:
         """Test GeneratedContent with default values."""
         content = GeneratedContent(
             unit_id="unit-1",
@@ -344,7 +345,7 @@ class TestFactoryFunctions:
     """Test cases for factory functions."""
 
     @patch('flowgenius.agents.content_generator.OpenAI')
-    def test_create_content_generator_with_api_key(self, mock_openai_class):
+    def test_create_content_generator_with_api_key(self, mock_openai_class: Mock) -> None:
         """Test creating content generator with API key."""
         mock_client = Mock()
         mock_openai_class.return_value = mock_client
@@ -356,7 +357,7 @@ class TestFactoryFunctions:
         assert generator.model == "gpt-4"
 
     @patch('flowgenius.agents.content_generator.OpenAI')
-    def test_create_content_generator_without_api_key(self, mock_openai_class):
+    def test_create_content_generator_without_api_key(self, mock_openai_class: Mock) -> None:
         """Test creating content generator without API key."""
         mock_client = Mock()
         mock_openai_class.return_value = mock_client
@@ -368,7 +369,7 @@ class TestFactoryFunctions:
         assert generator.model == "gpt-4o-mini"
 
     @patch('flowgenius.agents.content_generator.OpenAI')
-    def test_create_content_generator_failure(self, mock_openai_class):
+    def test_create_content_generator_failure(self, mock_openai_class: Mock) -> None:
         """Test factory function handling OpenAI client creation failure."""
         mock_openai_class.side_effect = Exception("API Error")
         
@@ -376,7 +377,7 @@ class TestFactoryFunctions:
             create_content_generator()
 
     @patch('flowgenius.agents.content_generator.create_content_generator')
-    def test_generate_unit_content_simple(self, mock_create_generator, sample_learning_unit):
+    def test_generate_unit_content_simple(self, mock_create_generator: Mock, sample_learning_unit: Any) -> None:
         """Test simple content generation utility function."""
         mock_generator = Mock()
         mock_content = GeneratedContent(

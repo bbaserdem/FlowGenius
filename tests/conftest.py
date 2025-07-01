@@ -3,6 +3,7 @@ Pytest configuration and shared fixtures for FlowGenius tests.
 """
 
 import pytest
+from typing import List
 from unittest.mock import Mock, patch
 from openai import OpenAI
 
@@ -10,7 +11,7 @@ from flowgenius.models.project import LearningUnit, LearningResource, EngageTask
 
 
 @pytest.fixture
-def mock_openai_client():
+def mock_openai_client() -> Mock:
     """Create a mock OpenAI client for testing."""
     client = Mock(spec=OpenAI)
     
@@ -26,7 +27,7 @@ def mock_openai_client():
 
 
 @pytest.fixture
-def sample_learning_unit():
+def sample_learning_unit() -> LearningUnit:
     """Create a sample learning unit for testing."""
     return LearningUnit(
         id="unit-1",
@@ -42,7 +43,7 @@ def sample_learning_unit():
 
 
 @pytest.fixture
-def sample_learning_resources():
+def sample_learning_resources() -> List[LearningResource]:
     """Create sample learning resources for testing."""
     return [
         LearningResource(
@@ -63,7 +64,7 @@ def sample_learning_resources():
 
 
 @pytest.fixture
-def sample_engage_tasks():
+def sample_engage_tasks() -> List[EngageTask]:
     """Create sample engage tasks for testing."""
     return [
         EngageTask(
@@ -82,7 +83,7 @@ def sample_engage_tasks():
 
 
 @pytest.fixture
-def mock_successful_resource_response():
+def mock_successful_resource_response() -> dict:
     """Mock successful OpenAI response for resource generation."""
     return {
         "resources": [
@@ -105,7 +106,7 @@ def mock_successful_resource_response():
 
 
 @pytest.fixture
-def mock_successful_task_response():
+def mock_successful_task_response() -> dict:
     """Mock successful OpenAI response for task generation."""
     return {
         "tasks": [

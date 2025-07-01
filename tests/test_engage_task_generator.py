@@ -4,6 +4,7 @@ Tests for the Engage Task Generator Agent.
 
 import json
 import pytest
+from typing import Any
 from unittest.mock import Mock, patch
 
 from flowgenius.agents.engage_task_generator import (
@@ -18,7 +19,7 @@ from flowgenius.models.project import EngageTask
 class TestEngageTaskGeneratorAgent:
     """Test cases for EngageTaskGeneratorAgent."""
 
-    def test_init(self, mock_openai_client):
+    def test_init(self, mock_openai_client: Mock) -> None:
         """Test agent initialization."""
         agent = EngageTaskGeneratorAgent(mock_openai_client)
         assert agent.client == mock_openai_client
@@ -28,7 +29,7 @@ class TestEngageTaskGeneratorAgent:
         agent_custom = EngageTaskGeneratorAgent(mock_openai_client, model="gpt-4")
         assert agent_custom.model == "gpt-4"
 
-    def test_generate_tasks_success(self, mock_openai_client, sample_learning_unit, mock_successful_task_response):
+    def test_generate_tasks_success(self, mock_openai_client: Mock, sample_learning_unit: Any, mock_successful_task_response: dict) -> None:
         """Test successful task generation."""
         # Setup mock response
         mock_openai_client.chat.completions.create.return_value.choices[0].message.content = json.dumps(mock_successful_task_response)
@@ -46,7 +47,7 @@ class TestEngageTaskGeneratorAgent:
         assert tasks[1].title == "Python Syntax Reflection"
         assert tasks[1].type == "reflection"
 
-    def test_generate_tasks_with_resources(self, mock_openai_client, sample_learning_unit, sample_learning_resources, mock_successful_task_response):
+    def test_generate_tasks_with_resources(self, mock_openai_client: Mock, sample_learning_unit: Any, sample_learning_resources: Any, mock_successful_task_response: dict) -> None:
         """Test task generation with resource context."""
         mock_openai_client.chat.completions.create.return_value.choices[0].message.content = json.dumps(mock_successful_task_response)
         
@@ -66,7 +67,7 @@ class TestEngageTaskGeneratorAgent:
         # Verify that OpenAI was called with the correct prompt including resources
         mock_openai_client.chat.completions.create.assert_called_once()
 
-    def test_generate_tasks_api_failure(self, mock_openai_client, sample_learning_unit):
+    def test_generate_tasks_api_failure(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test task generation when API fails."""
         # Simulate API failure
         mock_openai_client.chat.completions.create.side_effect = Exception("API Error")
@@ -81,7 +82,7 @@ class TestEngageTaskGeneratorAgent:
         assert len(tasks) == 2
         assert all(isinstance(t, EngageTask) for t in tasks)
 
-    def test_generate_tasks_insufficient_ai_response(self, mock_openai_client, sample_learning_unit):
+    def test_generate_tasks_insufficient_ai_response(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test when AI doesn't provide enough tasks."""
         # Mock response with insufficient tasks
         insufficient_response = {"tasks": [
@@ -105,7 +106,7 @@ class TestEngageTaskGeneratorAgent:
         assert len(tasks) == 3  # 1 from AI + 2 fallback
         assert tasks[0].title == "Single Task"
 
-    def test_build_system_prompt(self, mock_openai_client):
+    def test_build_system_prompt(self, mock_openai_client: Mock) -> None:
         """Test system prompt building."""
         agent = EngageTaskGeneratorAgent(mock_openai_client)
         prompt = agent._build_system_prompt()
@@ -119,7 +120,7 @@ class TestEngageTaskGeneratorAgent:
         assert "quiz" in prompt
         assert "experiment" in prompt
 
-    def test_build_user_prompt(self, mock_openai_client, sample_learning_unit, sample_learning_resources):
+    def test_build_user_prompt(self, mock_openai_client: Mock, sample_learning_unit: Any, sample_learning_resources: Any) -> None:
         """Test user prompt building."""
         agent = EngageTaskGeneratorAgent(mock_openai_client)
         request = TaskGenerationRequest(
@@ -145,7 +146,7 @@ class TestEngageTaskGeneratorAgent:
         for objective in sample_learning_unit.learning_objectives:
             assert objective in prompt
 
-    def test_build_user_prompt_no_resources(self, mock_openai_client, sample_learning_unit):
+    def test_build_user_prompt_no_resources(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test user prompt building without resources."""
         agent = EngageTaskGeneratorAgent(mock_openai_client)
         request = TaskGenerationRequest(unit=sample_learning_unit)
@@ -154,7 +155,7 @@ class TestEngageTaskGeneratorAgent:
         
         assert "Available Resources:" not in prompt
 
-    def test_generate_fallback_tasks(self, mock_openai_client, sample_learning_unit):
+    def test_generate_fallback_tasks(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test fallback task generation."""
         agent = EngageTaskGeneratorAgent(mock_openai_client)
         request = TaskGenerationRequest(unit=sample_learning_unit)
@@ -170,7 +171,7 @@ class TestEngageTaskGeneratorAgent:
         assert "practice" in types
         assert "project" in types
 
-    def test_create_fallback_tasks(self, mock_openai_client, sample_learning_unit):
+    def test_create_fallback_tasks(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test complete fallback task creation."""
         agent = EngageTaskGeneratorAgent(mock_openai_client)
         request = TaskGenerationRequest(unit=sample_learning_unit, num_tasks=2)
@@ -186,7 +187,7 @@ class TestEngageTaskGeneratorAgent:
 class TestTaskFormatting:
     """Test cases for task formatting functions."""
 
-    def test_format_tasks_for_markdown(self, sample_engage_tasks):
+    def test_format_tasks_for_markdown(self, sample_engage_tasks: Any) -> None:
         """Test markdown formatting for tasks."""
         formatted = format_tasks_for_markdown(sample_engage_tasks)
         
@@ -199,7 +200,7 @@ class TestTaskFormatting:
         assert "*(15 min)*" in formatted[1]
         assert "Think about how Python applies" in formatted[1]
 
-    def test_format_tasks_different_types(self):
+    def test_format_tasks_different_types(self) -> None:
         """Test formatting for different task types."""
         tasks = [
             EngageTask(title="Reflect", description="Think", type="reflection"),
@@ -217,7 +218,7 @@ class TestTaskFormatting:
         assert "❓" in formatted[3]  # quiz
         assert "🧪" in formatted[4]  # experiment
 
-    def test_format_tasks_minimal_info(self):
+    def test_format_tasks_minimal_info(self) -> None:
         """Test formatting with minimal task information."""
         task = EngageTask(
             title="Simple Task",
@@ -236,7 +237,7 @@ class TestTaskFormatting:
 class TestSuggestTaskForObjectives:
     """Test cases for objective-based task suggestion."""
 
-    def test_suggest_task_apply_objectives(self):
+    def test_suggest_task_apply_objectives(self) -> None:
         """Test task suggestion for application-focused objectives."""
         objectives = [
             "Apply Python concepts to real problems",
@@ -251,7 +252,7 @@ class TestSuggestTaskForObjectives:
         assert "Python Basics" in task.title
         assert "practical example" in task.description
 
-    def test_suggest_task_analyze_objectives(self):
+    def test_suggest_task_analyze_objectives(self) -> None:
         """Test task suggestion for analysis-focused objectives."""
         objectives = [
             "Analyze different programming paradigms",
@@ -266,7 +267,7 @@ class TestSuggestTaskForObjectives:
         assert "Programming Concepts" in task.title
         assert "analysis" in task.description
 
-    def test_suggest_task_practice_objectives(self):
+    def test_suggest_task_practice_objectives(self) -> None:
         """Test task suggestion for practice-focused objectives."""
         objectives = [
             "Practice writing Python functions",
@@ -281,7 +282,7 @@ class TestSuggestTaskForObjectives:
         assert "Python Functions" in task.title
         assert "exercises" in task.description
 
-    def test_suggest_task_default_objectives(self):
+    def test_suggest_task_default_objectives(self) -> None:
         """Test task suggestion for general objectives."""
         objectives = [
             "Understand basic concepts",
@@ -296,7 +297,7 @@ class TestSuggestTaskForObjectives:
         assert "General Topic" in task.title
         assert "reflect" in task.description
 
-    def test_suggest_task_empty_objectives(self):
+    def test_suggest_task_empty_objectives(self) -> None:
         """Test task suggestion with empty objectives."""
         task = suggest_task_for_objectives([], "Empty Topic")
         
@@ -307,7 +308,7 @@ class TestSuggestTaskForObjectives:
 class TestTaskGenerationRequest:
     """Test cases for TaskGenerationRequest model."""
 
-    def test_task_generation_request_defaults(self, sample_learning_unit):
+    def test_task_generation_request_defaults(self, sample_learning_unit: Any) -> None:
         """Test TaskGenerationRequest with default values."""
         request = TaskGenerationRequest(unit=sample_learning_unit)
         
@@ -317,7 +318,7 @@ class TestTaskGenerationRequest:
         assert request.difficulty_preference is None
         assert request.focus_on_application is True
 
-    def test_task_generation_request_custom_values(self, sample_learning_unit, sample_learning_resources):
+    def test_task_generation_request_custom_values(self, sample_learning_unit: Any, sample_learning_resources: Any) -> None:
         """Test TaskGenerationRequest with custom values."""
         request = TaskGenerationRequest(
             unit=sample_learning_unit,

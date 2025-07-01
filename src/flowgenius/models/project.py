@@ -90,7 +90,7 @@ class LearningProject(BaseModel):
                 return unit
         return None
     
-    def update_timestamp(self):
+    def update_timestamp(self) -> None:
         """Update the last modified timestamp."""
         self.metadata.updated_at = datetime.now()
 

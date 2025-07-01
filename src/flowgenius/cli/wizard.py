@@ -20,7 +20,7 @@ from ..models.config_manager import ConfigManager
     is_flag=True,
     help='Overwrite existing configuration without prompting'
 )
-def wizard(force: bool):
+def wizard(force: bool) -> None:
     """
     Interactive configuration wizard for FlowGenius.
     
@@ -111,7 +111,7 @@ def wizard(force: bool):
         click.echo("❌ Failed to save configuration.")
 
 
-def validate_path_exists(ctx, param, value):
+def validate_path_exists(ctx: click.Context, param: click.Parameter, value: str) -> Optional[Path]:
     """
     Validate that a given path exists.
     

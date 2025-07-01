@@ -46,7 +46,7 @@ class ContentGeneratorAgent:
     EngageTaskGeneratorAgent to provide a complete content generation solution.
     """
     
-    def __init__(self, openai_client: OpenAI, model: str = "gpt-4o-mini"):
+    def __init__(self, openai_client: OpenAI, model: str = "gpt-4o-mini") -> None:
         self.client = openai_client
         self.model = model
         

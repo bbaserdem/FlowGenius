@@ -34,7 +34,7 @@ from ..models.project_generator import ProjectGenerator
     is_flag=True,
     help='Open the project directory after creation'
 )
-def new(topic: str, motivation: str, units: int, open_project: bool):
+def new(topic: str, motivation: str, units: int, open_project: bool) -> None:
     """
     Create a new learning project.
     
@@ -123,7 +123,7 @@ def new(topic: str, motivation: str, units: int, open_project: bool):
         raise click.Abort()
 
 
-def _open_project_directory(project_path: Path):
+def _open_project_directory(project_path: Path) -> None:
     """
     Open the project directory in the default file manager.
     """
@@ -164,7 +164,7 @@ def _open_project_directory(project_path: Path):
     is_flag=True,
     help='Open the project directory after creation'
 )
-def create(topic: str, motivation: str, units: int, open_project: bool):
+def create(topic: str, motivation: str, units: int, open_project: bool) -> None:
     """
     Create a new learning project (non-interactive).
     

@@ -7,6 +7,7 @@ Some tests may require environment variables for API keys.
 
 import os
 import pytest
+from typing import Any
 from unittest.mock import Mock, patch
 
 from flowgenius.models.project import LearningUnit, LearningProject, ProjectMetadata
@@ -20,7 +21,7 @@ from flowgenius.agents import (
 class TestIntegration:
     """Integration tests for the complete agent workflow."""
 
-    def test_end_to_end_with_mock(self, mock_openai_client, sample_learning_unit):
+    def test_end_to_end_with_mock(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test complete end-to-end workflow with mocked API."""
         # Mock successful responses for both agents
         mock_responses = [
@@ -55,7 +56,7 @@ class TestIntegration:
         assert "Python Tutorial" in content.formatted_resources[0]
         assert "Build a Calculator" in content.formatted_tasks[0]
 
-    def test_fallback_system_integration(self, sample_learning_unit):
+    def test_fallback_system_integration(self, sample_learning_unit: Any) -> None:
         """Test that fallback systems work when API is unavailable."""
         # Test without any API client (simulating complete failure)
         with patch('flowgenius.agents.content_generator.OpenAI') as mock_openai_class:
@@ -82,7 +83,7 @@ class TestIntegration:
         notes_text = ' '.join(content.generation_notes).lower()
         assert "error" in notes_text or "fallback" in notes_text
 
-    def test_different_unit_types_integration(self, mock_openai_client):
+    def test_different_unit_types_integration(self, mock_openai_client: Mock) -> None:
         """Test integration with different types of learning units."""
         # Mock consistent responses
         mock_resource_response = '{"resources": [{"title": "Test Video", "url": "https://test.com", "type": "video", "description": "Test", "estimated_time": "20 min"}]}'
@@ -114,7 +115,7 @@ class TestIntegration:
         assert content.generation_success is True
         assert content.unit_id == "prog-1"
 
-    def test_batch_processing_integration(self, mock_openai_client):
+    def test_batch_processing_integration(self, mock_openai_client: Mock) -> None:
         """Test batch processing of multiple units."""
         # Create multiple units
         units = [
@@ -149,7 +150,7 @@ class TestIntegration:
             assert len(unit.resources) >= 1
             assert len(unit.engage_tasks) >= 1
 
-    def test_obsidian_vs_standard_formatting_integration(self, mock_openai_client, sample_learning_unit):
+    def test_obsidian_vs_standard_formatting_integration(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test different link formatting options."""
         mock_resource_response = '{"resources": [{"title": "Test Resource", "url": "https://example.com", "type": "article", "description": "Test", "estimated_time": "15 min"}]}'
         mock_task_response = '{"tasks": [{"title": "Test Task", "description": "Do test", "type": "reflection", "estimated_time": "10 min"}]}'
@@ -184,7 +185,7 @@ class TestIntegration:
         assert "📖" in formatted_resource_obsidian  # Article emoji
         assert "📖" in formatted_resource_standard  # Article emoji
 
-    def test_error_recovery_integration(self, mock_openai_client, sample_learning_unit):
+    def test_error_recovery_integration(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test that the system recovers gracefully from various errors."""
         with patch('flowgenius.agents.content_generator.OpenAI', return_value=mock_openai_client):
             generator = create_content_generator()
@@ -207,7 +208,7 @@ class TestIntegration:
         not os.getenv('OPENAI_API_KEY'), 
         reason="Requires OPENAI_API_KEY environment variable for live testing"
     )
-    def test_live_api_integration(self, sample_learning_unit):
+    def test_live_api_integration(self, sample_learning_unit: Any) -> None:
         """Test with real OpenAI API (requires API key)."""
         # This test only runs if OPENAI_API_KEY is set
         content = generate_unit_content_simple(sample_learning_unit)
@@ -232,7 +233,7 @@ class TestIntegration:
 class TestErrorHandling:
     """Test error handling scenarios."""
 
-    def test_invalid_learning_unit(self, mock_openai_client):
+    def test_invalid_learning_unit(self, mock_openai_client: Mock) -> None:
         """Test handling of invalid learning units."""
         # Unit with minimal information
         minimal_unit = LearningUnit(
@@ -251,7 +252,7 @@ class TestErrorHandling:
         assert len(content.resources) > 0
         assert len(content.engage_tasks) > 0
 
-    def test_network_timeout_simulation(self, sample_learning_unit):
+    def test_network_timeout_simulation(self, sample_learning_unit: Any) -> None:
         """Simulate network timeout scenarios."""
         import socket
         

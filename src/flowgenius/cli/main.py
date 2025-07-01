@@ -11,7 +11,7 @@ from .new import new, create
 
 @click.group()
 @click.version_option(version="0.1.0", prog_name="flowgenius")
-def cli():
+def cli() -> None:
     """
     FlowGenius: AI-assisted learning assistant that eliminates research paralysis.
     
@@ -27,6 +27,6 @@ cli.add_command(new)
 cli.add_command(create)
 
 
-def main():
+def main() -> None:
     """Main entry point for the FlowGenius CLI."""
     cli() 
