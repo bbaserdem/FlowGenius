@@ -66,6 +66,8 @@ def sample_project() -> LearningProject:
     ]
     
     metadata = ProjectMetadata(
+        id="python-basics-123",
+        title="Python Programming Basics",
         topic="Python Programming",
         motivation="To build better applications",
         created_at=datetime.now(),
@@ -73,8 +75,6 @@ def sample_project() -> LearningProject:
     )
     
     return LearningProject(
-        project_id="python-basics-123",
-        title="Python Programming Basics",
         metadata=metadata,
         units=units
     )
@@ -410,13 +410,13 @@ class TestErrorHandling:
         renderer = MarkdownRenderer(markdown_config)
         
         metadata = ProjectMetadata(
+            id="empty-123",
+            title="Empty Project",
             topic="Empty Project",
             created_at=datetime.now()
         )
         
         project = LearningProject(
-            project_id="empty-123",
-            title="Empty Project",
             metadata=metadata,
             units=[]
         )
@@ -442,13 +442,13 @@ class TestErrorHandling:
         )
         
         metadata = ProjectMetadata(
+            id="test-123",
+            title="Test Project",
             topic="Test",
             created_at=datetime.now()
         )
         
         project = LearningProject(
-            project_id="test-123",
-            title="Test Project", 
             metadata=metadata,
             units=[unit]
         )
