@@ -461,3 +461,190 @@ class TestErrorHandling:
         # Should handle missing fields gracefully
         assert "estimated_duration:" not in content
         assert "Prerequisites" not in content 
+
+
+class TestMarkdownFileGeneration:
+    """Integration tests for complete markdown file generation."""
+    
+    def test_complete_project_rendering_obsidian_style(
+        self,
+        obsidian_config: FlowGeniusConfig,
+        sample_project: LearningProject,
+        sample_generated_content: GeneratedContent
+    ) -> None:
+        """Test complete project rendering with Obsidian link style."""
+        renderer = MarkdownRenderer(obsidian_config)
+        
+        # Create unit content map
+        unit_content_map = {
+            "unit-1": sample_generated_content
+        }
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_dir = Path(temp_dir)
+            (project_dir / "units").mkdir()
+            
+            # Render all files
+            renderer.render_project_files(
+                sample_project, 
+                project_dir,
+                unit_content_map=unit_content_map
+            )
+            
+            # Verify all files were created
+            assert (project_dir / "project.json").exists()
+            assert (project_dir / "toc.md").exists()
+            assert (project_dir / "README.md").exists()
+            assert (project_dir / "units" / "unit-1.md").exists()
+            assert (project_dir / "units" / "unit-2.md").exists()
+            
+            # Verify TOC content
+            toc_content = (project_dir / "toc.md").read_text()
+            assert "Python Programming Basics" in toc_content
+            assert "content_generated: 1/2 units" in toc_content
+            assert "[[units/unit-1.md|Introduction to Python]]" in toc_content  # Obsidian style
+            assert "| unit-1 | [[units/unit-1.md|Introduction to Python]] | 2 hours | Pending | 2 | 1 |" in toc_content
+            
+            # Verify README content
+            readme_content = (project_dir / "README.md").read_text()
+            assert "Python Programming Basics" in readme_content
+            assert "Python Programming learning project created with FlowGenius" in readme_content
+            assert "[[units/unit-1.md|Introduction to Python]]" in readme_content  # Obsidian style
+            
+            # Verify unit-1 file with generated content
+            unit1_content = (project_dir / "units" / "unit-1.md").read_text()
+            assert "title: Introduction to Python" in unit1_content
+            assert "content_generated: True" in unit1_content
+            assert "resources_count: 2" in unit1_content
+            assert "🎥 [Python Tutorial Video]" in unit1_content
+            assert "🎯 **Build a Calculator**" in unit1_content
+            assert "Content Generation Notes" in unit1_content
+            
+            # Verify unit-2 file without generated content
+            unit2_content = (project_dir / "units" / "unit-2.md").read_text()
+            assert "title: Python Data Structures" in unit2_content
+            assert "content_generated:" not in unit2_content
+            assert "TODO: Add curated resources" in unit2_content
+            assert "[[unit-1.md|Unit unit-1]]" in unit2_content  # Prerequisites with Obsidian style
+    
+    def test_complete_project_rendering_markdown_style(
+        self,
+        markdown_config: FlowGeniusConfig,
+        sample_project: LearningProject
+    ) -> None:
+        """Test complete project rendering with standard markdown link style."""
+        renderer = MarkdownRenderer(markdown_config)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_dir = Path(temp_dir)
+            (project_dir / "units").mkdir()
+            
+            # Render all files without generated content
+            renderer.render_project_files(sample_project, project_dir)
+            
+            # Verify all files were created
+            assert (project_dir / "project.json").exists()
+            assert (project_dir / "toc.md").exists()
+            assert (project_dir / "README.md").exists()
+            assert (project_dir / "units" / "unit-1.md").exists()
+            assert (project_dir / "units" / "unit-2.md").exists()
+            
+            # Verify TOC uses markdown style links
+            toc_content = (project_dir / "toc.md").read_text()
+            assert "[Introduction to Python](units/unit-1.md)" in toc_content  # Markdown style
+            assert "content_generated:" not in toc_content  # No generated content
+            assert "| unit-1 | [Introduction to Python](units/unit-1.md) | 2 hours | Pending | TBD | TBD |" in toc_content
+            
+            # Verify README uses markdown style links  
+            readme_content = (project_dir / "README.md").read_text()
+            assert "[Introduction to Python](units/unit-1.md)" in readme_content  # Markdown style
+            
+            # Verify unit-2 prerequisites use markdown style
+            unit2_content = (project_dir / "units" / "unit-2.md").read_text()
+            assert "[Unit unit-1](unit-1.md)" in unit2_content  # Prerequisites with markdown style
+    
+    def test_individual_unit_file_generation(
+        self,
+        obsidian_config: FlowGeniusConfig,
+        sample_project: LearningProject,
+        sample_generated_content: GeneratedContent
+    ) -> None:
+        """Test individual unit file rendering with generated content."""
+        renderer = MarkdownRenderer(obsidian_config)
+        unit = sample_project.units[0]
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+            output_path = Path(f.name)
+        
+        try:
+            # Render individual unit file
+            renderer.render_unit_file(
+                unit, 
+                sample_project, 
+                output_path,
+                generated_content=sample_generated_content
+            )
+            
+            # Verify file was created and has correct content
+            assert output_path.exists()
+            content = output_path.read_text()
+            
+            # Check YAML frontmatter
+            assert "---" in content
+            assert "title: Introduction to Python" in content
+            assert "unit_id: unit-1" in content
+            assert "project: Python Programming Basics" in content
+            assert "status: pending" in content
+            assert "content_generated: True" in content
+            assert "resources_count: 2" in content
+            assert "tasks_count: 1" in content
+            
+            # Check content sections
+            assert "# Introduction to Python" in content
+            assert "## Learning Objectives" in content
+            assert "## Resources" in content
+            assert "## Practice & Engagement" in content
+            assert "## Content Generation Notes" in content
+            assert "## Your Notes" in content
+            
+            # Check generated content integration
+            assert "🎥 [Python Tutorial Video]" in content
+            assert "🎯 **Build a Calculator**" in content
+            assert "Generated successfully using AI" in content
+            
+        finally:
+            output_path.unlink()  # Clean up
+    
+    def test_project_json_metadata_generation(
+        self,
+        markdown_config: FlowGeniusConfig,
+        sample_project: LearningProject
+    ) -> None:
+        """Test that project.json metadata file is generated correctly."""
+        renderer = MarkdownRenderer(markdown_config)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_dir = Path(temp_dir)
+            (project_dir / "units").mkdir()
+            
+            # Render files
+            renderer.render_project_files(sample_project, project_dir)
+            
+            # Verify project.json exists and has correct content
+            metadata_file = project_dir / "project.json"
+            assert metadata_file.exists()
+            
+            import json
+            with open(metadata_file) as f:
+                metadata = json.load(f)
+            
+            # Check metadata structure
+            assert "metadata" in metadata
+            assert "units" in metadata
+            assert metadata["metadata"]["id"] == "python-basics-123"
+            assert metadata["metadata"]["title"] == "Python Programming Basics"
+            assert metadata["metadata"]["topic"] == "Python Programming"
+            assert metadata["metadata"]["motivation"] == "To build better applications"
+            assert len(metadata["units"]) == 2
+            assert metadata["units"][0]["id"] == "unit-1"
+            assert metadata["units"][1]["id"] == "unit-2" 
