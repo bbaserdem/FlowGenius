@@ -6,7 +6,7 @@ active learning tasks for learning units.
 """
 
 import json
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from openai import OpenAI
 from pydantic import BaseModel
 
@@ -34,7 +34,7 @@ class EngageTaskGeneratorAgent:
         self.client = openai_client
         self.model = model
     
-    def generate_tasks(self, request: TaskGenerationRequest) -> List[EngageTask]:
+    def generate_tasks(self, request: TaskGenerationRequest) -> Tuple[List[EngageTask], bool]:
         """
         Generate engaging tasks for a specific unit.
         
@@ -42,7 +42,7 @@ class EngageTaskGeneratorAgent:
             request: TaskGenerationRequest with unit and task requirements
             
         Returns:
-            List of EngageTask objects with active learning activities
+            Tuple of (List of EngageTask objects, success flag indicating if AI generation was used)
         """
         try:
             # Generate tasks using AI
@@ -52,11 +52,18 @@ class EngageTaskGeneratorAgent:
             if len(tasks) < request.num_tasks:
                 tasks.extend(self._generate_fallback_tasks(request, request.num_tasks - len(tasks)))
             
-            return tasks[:request.num_tasks]
+            return tasks[:request.num_tasks], True
             
         except Exception as e:
             # Fallback to basic tasks if AI fails
-            return self._create_fallback_tasks(request)
+            return self._create_fallback_tasks(request), False
+    
+    def generate_tasks_legacy(self, request: TaskGenerationRequest) -> List[EngageTask]:
+        """
+        Legacy method that returns only tasks for backward compatibility.
+        """
+        tasks, _ = self.generate_tasks(request)
+        return tasks
     
     def _generate_tasks_with_ai(self, request: TaskGenerationRequest) -> List[EngageTask]:
         """

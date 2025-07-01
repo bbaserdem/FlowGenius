@@ -34,10 +34,11 @@ class TestEngageTaskGeneratorAgent:
         mock_openai_client.chat.completions.create.return_value.choices[0].message.content = json.dumps(mock_successful_task_response)
         
         agent = EngageTaskGeneratorAgent(mock_openai_client)
-        request = TaskGenerationRequest(unit=sample_learning_unit)
+        request = TaskGenerationRequest(unit=sample_learning_unit, num_tasks=2)  # Request 2 tasks to match mock response
         
-        tasks = agent.generate_tasks(request)
+        tasks, success = agent.generate_tasks(request)
         
+        assert success is True
         assert len(tasks) == 2
         assert all(isinstance(t, EngageTask) for t in tasks)
         assert tasks[0].title == "Build a Simple Calculator"
@@ -58,8 +59,9 @@ class TestEngageTaskGeneratorAgent:
             focus_on_application=True
         )
         
-        tasks = agent.generate_tasks(request)
+        tasks, success = agent.generate_tasks(request)
         
+        assert success is True
         assert len(tasks) == 2
         # Verify that OpenAI was called with the correct prompt including resources
         mock_openai_client.chat.completions.create.assert_called_once()
@@ -72,9 +74,10 @@ class TestEngageTaskGeneratorAgent:
         agent = EngageTaskGeneratorAgent(mock_openai_client)
         request = TaskGenerationRequest(unit=sample_learning_unit, num_tasks=2)
         
-        tasks = agent.generate_tasks(request)
+        tasks, success = agent.generate_tasks(request)
         
-        # Should still return fallback tasks
+        # Should use fallback content
+        assert success is False
         assert len(tasks) == 2
         assert all(isinstance(t, EngageTask) for t in tasks)
 
@@ -95,9 +98,10 @@ class TestEngageTaskGeneratorAgent:
         agent = EngageTaskGeneratorAgent(mock_openai_client)
         request = TaskGenerationRequest(unit=sample_learning_unit, num_tasks=3)
         
-        tasks = agent.generate_tasks(request)
+        tasks, success = agent.generate_tasks(request)
         
-        # Should supplement with fallback tasks
+        # Should supplement with fallback tasks but still be successful since AI provided some
+        assert success is True
         assert len(tasks) == 3  # 1 from AI + 2 fallback
         assert tasks[0].title == "Single Task"
 

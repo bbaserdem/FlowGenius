@@ -65,6 +65,8 @@ class ContentGeneratorAgent:
             GeneratedContent with resources, tasks, and formatted outputs
         """
         generation_notes = []
+        resources_success = False
+        tasks_success = False
         
         try:
             # Step 1: Generate resources
@@ -76,8 +78,11 @@ class ContentGeneratorAgent:
                 difficulty_preference=request.difficulty_preference
             )
             
-            resources = self.resource_curator.curate_resources(resource_request)
-            generation_notes.append(f"Generated {len(resources)} resources successfully")
+            resources, resources_success = self.resource_curator.curate_resources(resource_request)
+            if resources_success:
+                generation_notes.append(f"Generated {len(resources)} resources successfully")
+            else:
+                generation_notes.append(f"Used fallback resources ({len(resources)} resources)")
             
             # Step 2: Generate engage tasks (with resource context)
             task_request = TaskGenerationRequest(
@@ -88,12 +93,18 @@ class ContentGeneratorAgent:
                 focus_on_application=request.focus_on_application
             )
             
-            engage_tasks = self.task_generator.generate_tasks(task_request)
-            generation_notes.append(f"Generated {len(engage_tasks)} engage tasks successfully")
+            engage_tasks, tasks_success = self.task_generator.generate_tasks(task_request)
+            if tasks_success:
+                generation_notes.append(f"Generated {len(engage_tasks)} engage tasks successfully")
+            else:
+                generation_notes.append(f"Used fallback tasks ({len(engage_tasks)} tasks)")
             
             # Step 3: Format content for markdown
             formatted_resources = self._format_resources(resources, request.use_obsidian_links)
             formatted_tasks = self._format_tasks(engage_tasks)
+            
+            # Overall success is True only if both agents succeeded with AI generation
+            overall_success = resources_success and tasks_success
             
             return GeneratedContent(
                 unit_id=request.unit.id,
@@ -101,7 +112,7 @@ class ContentGeneratorAgent:
                 engage_tasks=engage_tasks,
                 formatted_resources=formatted_resources,
                 formatted_tasks=formatted_tasks,
-                generation_success=True,
+                generation_success=overall_success,
                 generation_notes=generation_notes
             )
             

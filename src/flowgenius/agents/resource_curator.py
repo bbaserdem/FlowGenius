@@ -6,7 +6,7 @@ learning resources (videos, articles, papers) for learning units.
 """
 
 import json
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from openai import OpenAI
 from pydantic import BaseModel
 
@@ -34,7 +34,7 @@ class ResourceCuratorAgent:
         self.client = openai_client
         self.model = model
     
-    def curate_resources(self, request: ResourceRequest) -> List[LearningResource]:
+    def curate_resources(self, request: ResourceRequest) -> Tuple[List[LearningResource], bool]:
         """
         Curate learning resources for a specific unit.
         
@@ -42,7 +42,7 @@ class ResourceCuratorAgent:
             request: ResourceRequest with unit and resource requirements
             
         Returns:
-            List of LearningResource objects with videos and readings
+            Tuple of (List of LearningResource objects, success flag indicating if AI generation was used)
         """
         try:
             # Generate resources using AI
@@ -58,11 +58,18 @@ class ResourceCuratorAgent:
             if reading_count < request.min_reading_resources:
                 resources.extend(self._generate_fallback_readings(request, request.min_reading_resources - reading_count))
             
-            return resources[:request.max_total_resources]
+            return resources[:request.max_total_resources], True
             
         except Exception as e:
             # Fallback to basic resources if AI fails
-            return self._create_fallback_resources(request)
+            return self._create_fallback_resources(request), False
+    
+    def curate_resources_legacy(self, request: ResourceRequest) -> List[LearningResource]:
+        """
+        Legacy method that returns only resources for backward compatibility.
+        """
+        resources, _ = self.curate_resources(request)
+        return resources
     
     def _generate_resources_with_ai(self, request: ResourceRequest) -> List[LearningResource]:
         """

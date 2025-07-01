@@ -35,8 +35,9 @@ class TestResourceCuratorAgent:
         agent = ResourceCuratorAgent(mock_openai_client)
         request = ResourceRequest(unit=sample_learning_unit)
         
-        resources = agent.curate_resources(request)
+        resources, success = agent.curate_resources(request)
         
+        assert success is True
         assert len(resources) == 2
         assert all(isinstance(r, LearningResource) for r in resources)
         assert resources[0].title == "Python Fundamentals Video Course"
@@ -57,7 +58,7 @@ class TestResourceCuratorAgent:
             difficulty_preference="beginner"
         )
         
-        resources = agent.curate_resources(request)
+        resources, success = agent.curate_resources(request)
         
         # Should have at least the minimum requirements
         video_count = sum(1 for r in resources if r.type == "video")
@@ -74,9 +75,10 @@ class TestResourceCuratorAgent:
         agent = ResourceCuratorAgent(mock_openai_client)
         request = ResourceRequest(unit=sample_learning_unit)
         
-        resources = agent.curate_resources(request)
+        resources, success = agent.curate_resources(request)
         
-        # Should still return fallback resources
+        # Should use fallback content
+        assert success is False
         assert len(resources) >= 2  # At least one video and one reading
         assert any(r.type == "video" for r in resources)
         assert any(r.type in ["article", "paper", "documentation"] for r in resources)
@@ -103,9 +105,10 @@ class TestResourceCuratorAgent:
             min_reading_resources=2  # More than provided
         )
         
-        resources = agent.curate_resources(request)
+        resources, success = agent.curate_resources(request)
         
-        # Should supplement with fallback resources
+        # Should supplement with fallback resources but still be successful since AI provided some
+        assert success is True
         assert len(resources) >= 3  # 1 from AI + 2 fallback readings
         video_count = sum(1 for r in resources if r.type == "video")
         reading_count = sum(1 for r in resources if r.type in ["article", "paper", "documentation"])

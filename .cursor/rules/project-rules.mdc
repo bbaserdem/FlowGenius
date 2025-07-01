@@ -1,7 +1,7 @@
 ---
-title: Project Rules
 description: A comprehensive guide to the project's structure, conventions, and coding standards.
-version: 1.0.0
+globs: 
+alwaysApply: false
 ---
 
 # Project Rules
@@ -42,6 +42,7 @@ These standards ensure our code is clean, consistent, and easy for both humans a
 *   **Error Handling**: Throw specific, descriptive errors instead of returning `None` or fallback values.
 *   **Variable Naming**: Use descriptive names with auxiliary verbs for booleans (e.g., `isLoading`, `hasCompleted`).
 *   **PEP8**: Whenever possible, use PEP8 conventions for naming.
+*   **Type Hints**: Use type annotations as detailed in PEP 484 when writing functions.
 
 ### 4.2. Documentation and Comments
 

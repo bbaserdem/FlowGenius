@@ -37,8 +37,8 @@ class TestContentGeneratorAgent:
         with patch.object(agent.resource_curator, 'curate_resources') as mock_resources, \
              patch.object(agent.task_generator, 'generate_tasks') as mock_tasks:
             
-            mock_resources.return_value = sample_learning_resources
-            mock_tasks.return_value = sample_engage_tasks
+            mock_resources.return_value = (sample_learning_resources, True)
+            mock_tasks.return_value = (sample_engage_tasks, True)
             
             request = ContentGenerationRequest(unit=sample_learning_unit)
             content = agent.generate_complete_content(request)
@@ -59,8 +59,8 @@ class TestContentGeneratorAgent:
         with patch.object(agent.resource_curator, 'curate_resources') as mock_resources, \
              patch.object(agent.task_generator, 'generate_tasks') as mock_tasks:
             
-            mock_resources.return_value = []
-            mock_tasks.return_value = []
+            mock_resources.return_value = ([], True)
+            mock_tasks.return_value = ([], True)
             
             request = ContentGenerationRequest(
                 unit=sample_learning_unit,

@@ -1,7 +1,7 @@
 ---
 description: Best practices for setting up local python environment in NixOS, integrated with uv package manager.
-globs: flake.nix, nix/*
-alwaysApply: false
+globs: flake.nix, nix/*, pyproject.toml, *requirements.txt, pylock.toml
+alwaysApply: true
 ---
 
 # NixOS
@@ -22,3 +22,16 @@ but uses nix in the background to handle dependencies.
 ## Guidelines for picking tech stack
 - Don't suggest packages and software that is known to be incompatible with NixOS.
 - State when a software I want to use is incompatible developing with NixOS.
+
+# Python
+
+## Guidelines for adding/removing python packages
+The system is setup such that all package addition and manipulation should be done by uv.
+For example, packages can be added with this command;
+`uv add pytorch`
+
+## Guidelines for running unit tests with pytest
+
+Flake is set to use pytest as testing suite
+To test, never run pytest or python directly.
+Use `nix flake check`; and the tests will run.

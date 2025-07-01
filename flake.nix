@@ -33,6 +33,15 @@
   }: let
     inherit (nixpkgs) lib;
 
+    # This example is only using x86_64-linux
+    pkgs = nixpkgs.legacyPackages.x86_64-linux;
+    inherit (pkgs) stdenv;
+
+    # Use Python 3.13 from nixpkgs
+    python = pkgs.python313;
+
+    baseSet = pkgs.callPackage pyproject-nix.build.packages {inherit python;};
+
     # Load a uv workspace from a workspace root.
     # Uv2nix treats all uv projects as workspace projects.
     workspace = uv2nix.lib.workspace.loadWorkspace {workspaceRoot = ./.;};
@@ -40,13 +49,7 @@
     # Create package overlay from workspace.
     overlay = workspace.mkPyprojectOverlay {
       # Prefer prebuilt binary wheels as a package source.
-      # Sdists are less likely to "just work" because of the metadata missing from uv.lock.
-      # Binary wheels are more likely to, but may still require overrides for library dependencies.
-      sourcePreference = "wheel"; # or sourcePreference = "sdist";
-      # Optionally customise PEP 508 environment
-      # environ = {
-      #   platform_release = "5.10.65";
-      # };
+      sourcePreference = "wheel";
     };
 
     # Extend generated overlay with build fixups
@@ -55,31 +58,69 @@
     # This is an additional overlay implementing build fixups.
     # See:
     # - https://pyproject-nix.github.io/uv2nix/FAQ.html
-    pyprojectOverrides = _final: _prev: {
+    pyprojectOverrides = final: prev: {
       # Implement build fixups here.
       # Note that uv2nix is _not_ using Nixpkgs buildPythonPackage.
       # It's using https://pyproject-nix.github.io/pyproject.nix/build.html
+      flowgenius = prev.flowgenius.overrideAttrs (old: {
+        passthru =
+          old.passthru
+          // {
+            # Put all tests in the passthru.tests attribute set.
+            # Nixpkgs also uses the passthru.tests mechanism for ofborg test discovery.
+            #
+            # For usage with Flakes we will refer to the passthru.tests attributes
+            # to construct the flake checks attribute set.
+            tests = let
+              virtualenv = final.mkVirtualEnv "flowgenius-pytest-env" {
+                flowgenius = ["test"];
+              };
+            in
+              (old.tests or {})
+              // {
+                pytest = stdenv.mkDerivation {
+                  name = "${final.flowgenius.name}-pytest";
+                  inherit (final.flowgenius) src;
+                  nativeBuildInputs = [
+                    virtualenv
+                  ];
+                  dontConfigure = true;
+
+                  # Because this package is running tests, and not actually building the main package
+                  # the build phase is running the tests.
+                  #
+                  # In this particular example we also output a HTML coverage report, which is used as the build output.
+                  buildPhase = ''
+                    runHook preBuild
+                    pytest --cov tests --cov-report html
+                    runHook postBuild
+                  '';
+
+                  # Install the HTML coverage report into the build output.
+                  #
+                  # If you wanted to install multiple test output formats such as TAP outputs
+                  # you could make this derivation a multiple-output derivation.
+                  #
+                  # See https://nixos.org/manual/nixpkgs/stable/#chap-multiple-output for more information on multiple outputs.
+                  installPhase = ''
+                    runHook preInstall
+                    mv htmlcov $out
+                    runHook postInstall
+                  '';
+                };
+              };
+          };
+      });
     };
 
-    # This example is only using x86_64-linux
-    pkgs = nixpkgs.legacyPackages.x86_64-linux;
-
-    # Use Python 3.13 from nixpkgs
-    python = pkgs.python313;
-
     # Construct package set
-    pythonSet =
-      # Use base package set from pyproject.nix builders
-      (pkgs.callPackage pyproject-nix.build.packages {
-        inherit python;
-      }).overrideScope
-      (
-        lib.composeManyExtensions [
-          pyproject-build-systems.overlays.default
-          overlay
-          pyprojectOverrides
-        ]
-      );
+    pythonSet = baseSet.overrideScope (
+      lib.composeManyExtensions [
+        pyproject-build-systems.overlays.default
+        overlay
+        pyprojectOverrides
+      ]
+    );
   in {
     # Package a virtual environment as our main application.
     #
@@ -92,6 +133,11 @@
         type = "app";
         program = "${self.packages.x86_64-linux.default}/bin/hello";
       };
+    };
+
+    # Make check available through nix flake check
+    checks.x86_64-linux = {
+      inherit (pythonSet.flowgenius.passthru.tests) pytest;
     };
 
     # This example provides two different modes of development:
