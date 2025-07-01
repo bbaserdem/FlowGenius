@@ -364,7 +364,7 @@ Some content here.
         obsidian_config: FlowGeniusConfig,
         sample_project: LearningProject
     ) -> None:
-        """Test full project rendering with progress callback."""
+        """Test full project rendering with enhanced granular progress callback."""
         renderer = MarkdownRenderer(obsidian_config)
         
         # Track progress calls
@@ -380,26 +380,158 @@ Some content here.
             # Create required subdirectories
             (project_dir / "units").mkdir()
             
-            # Render files
+            # Render files with granular progress tracking
             renderer.render_project_files(
                 sample_project, 
                 project_dir, 
                 progress_callback=progress_callback
             )
             
-            # Check that progress was tracked
-            assert len(progress_calls) == 4  # metadata, toc, units, readme
-            assert progress_calls[0] == ("Creating metadata files...", 1, 4)
-            assert progress_calls[1] == ("Creating toc files...", 2, 4)
-            assert progress_calls[2] == ("Creating units files...", 3, 4)
-            assert progress_calls[3] == ("Creating readme files...", 4, 4)
+            # Verify enhanced progress tracking (metadata + toc + 2 units + readme = 5 steps)
+            expected_total = 5  # 3 base files + 2 units
+            assert len(progress_calls) == expected_total
             
-            # Check that files were created
+            # Check specific progress messages
+            assert progress_calls[0] == ("Creating project metadata...", 1, expected_total)
+            assert progress_calls[1] == ("Generating table of contents...", 2, expected_total)
+            assert progress_calls[2] == ("Creating unit file unit-1 (1/2)...", 3, expected_total)
+            assert progress_calls[3] == ("Creating unit file unit-2 (2/2)...", 4, expected_total)
+            assert progress_calls[4] == ("Creating README file...", 5, expected_total)
+            
+            # Verify all files were created
             assert (project_dir / "project.json").exists()
             assert (project_dir / "toc.md").exists()
             assert (project_dir / "README.md").exists()
             assert (project_dir / "units" / "unit-1.md").exists()
             assert (project_dir / "units" / "unit-2.md").exists()
+    
+    def test_track_unit_progress(
+        self,
+        markdown_config: FlowGeniusConfig,
+        sample_project: LearningProject
+    ) -> None:
+        """Test tracking progress for individual units."""
+        renderer = MarkdownRenderer(markdown_config)
+        
+        # Track progress calls
+        progress_calls = []
+        
+        def progress_callback(message: str, current: int, total: int):
+            progress_calls.append((message, current, total))
+        
+        # Create a project directory with unit file
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_dir = Path(temp_dir)
+            (project_dir / "units").mkdir()
+            
+            # First render the project to create unit files
+            renderer.render_project_files(sample_project, project_dir)
+            
+            # Clear progress calls from initial rendering
+            progress_calls.clear()
+            
+            # Test tracking unit progress
+            completion_date = datetime(2023, 12, 25, 15, 30, 0)
+            renderer.track_unit_progress(
+                project_dir,
+                "unit-1",
+                "completed",
+                completion_date,
+                progress_callback
+            )
+            
+            # Verify progress callback was called
+            assert len(progress_calls) == 2
+            assert progress_calls[0] == ("Updating progress for unit unit-1...", 1, 1)
+            assert progress_calls[1] == ("Unit unit-1 marked as completed (completed on 2023-12-25)", 1, 1)
+            
+            # Verify unit file was updated
+            unit_file = project_dir / "units" / "unit-1.md"
+            content = unit_file.read_text()
+            assert "status: completed" in content
+            assert "completed_date: 2023-12-25T15:30:00" in content
+    
+    def test_get_rendering_progress_info(
+        self,
+        obsidian_config: FlowGeniusConfig,
+        sample_project: LearningProject
+    ) -> None:
+        """Test getting rendering progress information."""
+        renderer = MarkdownRenderer(obsidian_config)
+        
+        progress_info = renderer.get_rendering_progress_info(sample_project)
+        
+        # Verify progress information structure
+        assert "total_files" in progress_info
+        assert "file_breakdown" in progress_info
+        assert "unit_files" in progress_info
+        assert "estimated_steps" in progress_info
+        
+        # Verify counts
+        assert progress_info["total_files"] == 5  # metadata, toc, readme + 2 units
+        assert progress_info["estimated_steps"] == 5
+        
+        # Verify breakdown
+        breakdown = progress_info["file_breakdown"]
+        assert breakdown["metadata"] == 1
+        assert breakdown["toc"] == 1
+        assert breakdown["readme"] == 1
+        assert breakdown["units"] == 2
+        
+        # Verify unit files list
+        unit_files = progress_info["unit_files"]
+        assert len(unit_files) == 2
+        assert "unit-1.md" in unit_files
+        assert "unit-2.md" in unit_files
+    
+    def test_progress_tracking_with_empty_project(
+        self,
+        markdown_config: FlowGeniusConfig
+    ) -> None:
+        """Test progress tracking with a project that has no units."""
+        renderer = MarkdownRenderer(markdown_config)
+        
+        # Create empty project
+        metadata = ProjectMetadata(
+            id="empty-123",
+            title="Empty Project",
+            topic="Empty Project",
+            created_at=datetime.now()
+        )
+        
+        empty_project = LearningProject(
+            metadata=metadata,
+            units=[]
+        )
+        
+        # Track progress calls
+        progress_calls = []
+        
+        def progress_callback(message: str, current: int, total: int):
+            progress_calls.append((message, current, total))
+        
+        # Test progress info for empty project
+        progress_info = renderer.get_rendering_progress_info(empty_project)
+        assert progress_info["total_files"] == 3  # metadata, toc, readme only
+        assert progress_info["file_breakdown"]["units"] == 0
+        assert progress_info["unit_files"] == []
+        
+        # Test rendering empty project
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_dir = Path(temp_dir)
+            (project_dir / "units").mkdir()
+            
+            renderer.render_project_files(
+                empty_project,
+                project_dir,
+                progress_callback=progress_callback
+            )
+            
+            # Should have 3 progress calls (metadata, toc, readme)
+            assert len(progress_calls) == 3
+            assert progress_calls[0] == ("Creating project metadata...", 1, 3)
+            assert progress_calls[1] == ("Generating table of contents...", 2, 3)
+            assert progress_calls[2] == ("Creating README file...", 3, 3)
 
 
 class TestErrorHandling:

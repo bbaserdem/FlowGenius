@@ -50,23 +50,40 @@ class MarkdownRenderer:
             project: The learning project to render
             project_dir: Directory where files should be created
             unit_content_map: Optional mapping of unit IDs to generated content
-            progress_callback: Optional callback for progress updates
+            progress_callback: Optional callback for progress updates (message, current, total)
         """
-        files_to_create = ["metadata", "toc", "units", "readme"]
-        total_files = len(files_to_create)
+        # Calculate total steps (metadata, toc, readme + individual units)
+        total_steps = 3 + len(project.units)  # metadata, toc, readme + each unit
+        current_step = 0
         
-        for i, file_type in enumerate(files_to_create, 1):
+        # Step 1: Write metadata
+        current_step += 1
+        if progress_callback:
+            progress_callback("Creating project metadata...", current_step, total_steps)
+        self._write_metadata_file(project, project_dir)
+        
+        # Step 2: Write TOC
+        current_step += 1
+        if progress_callback:
+            progress_callback("Generating table of contents...", current_step, total_steps)
+        self._write_toc_file(project, project_dir, unit_content_map)
+        
+        # Step 3: Write individual unit files with granular progress
+        for i, unit in enumerate(project.units, 1):
+            current_step += 1
             if progress_callback:
-                progress_callback(f"Creating {file_type} files...", i, total_files)
+                progress_callback(f"Creating unit file {unit.id} ({i}/{len(project.units)})...", current_step, total_steps)
             
-            if file_type == "metadata":
-                self._write_metadata_file(project, project_dir)
-            elif file_type == "toc":
-                self._write_toc_file(project, project_dir, unit_content_map)
-            elif file_type == "units":
-                self._write_unit_files(project, project_dir, unit_content_map)
-            elif file_type == "readme":
-                self._write_readme_file(project, project_dir)
+            unit_file = project_dir / "units" / f"{unit.id}.md"
+            generated_content = unit_content_map.get(unit.id) if unit_content_map else None
+            content = self._build_unit_content(unit, project, generated_content)
+            unit_file.write_text(content)
+        
+        # Final step: Write README
+        current_step += 1
+        if progress_callback:
+            progress_callback("Creating README file...", current_step, total_steps)
+        self._write_readme_file(project, project_dir)
     
     def render_unit_file(
         self, 
@@ -435,4 +452,57 @@ class MarkdownRenderer:
         if self.config.link_style == "obsidian":
             return f"[[{path}|{title}]]"
         else:  # markdown
-            return f"[{title}]({path})" 
+            return f"[{title}]({path})"
+    
+    def track_unit_progress(
+        self,
+        project_dir: Path,
+        unit_id: str,
+        new_status: str,
+        completion_date: Optional[datetime] = None,
+        progress_callback: Optional[callable] = None
+    ) -> None:
+        """
+        Track and update progress for a specific unit.
+        
+        Args:
+            project_dir: Project directory containing unit files
+            unit_id: ID of the unit to update
+            new_status: New status for the unit
+            completion_date: Optional completion timestamp
+            progress_callback: Optional callback for progress updates
+        """
+        unit_file_path = project_dir / "units" / f"{unit_id}.md"
+        
+        if progress_callback:
+            progress_callback(f"Updating progress for unit {unit_id}...", 1, 1)
+        
+        self.update_unit_progress(unit_file_path, new_status, completion_date)
+        
+        if progress_callback:
+            status_message = f"Unit {unit_id} marked as {new_status}"
+            if completion_date:
+                status_message += f" (completed on {completion_date.strftime('%Y-%m-%d')})"
+            progress_callback(status_message, 1, 1)
+    
+    def get_rendering_progress_info(self, project: LearningProject) -> Dict[str, Any]:
+        """
+        Get information about what will be rendered for progress estimation.
+        
+        Args:
+            project: The learning project
+            
+        Returns:
+            Dictionary with rendering progress information
+        """
+        return {
+            "total_files": 3 + len(project.units),  # metadata, toc, readme + units
+            "file_breakdown": {
+                "metadata": 1,
+                "toc": 1, 
+                "readme": 1,
+                "units": len(project.units)
+            },
+            "unit_files": [f"{unit.id}.md" for unit in project.units],
+            "estimated_steps": 3 + len(project.units)
+        } 
