@@ -1,0 +1,11 @@
+# Task ID: 10
+# Title: Write README and Demo Script
+# Status: pending
+# Dependencies: 9
+# Priority: medium
+# Description: Document the project setup and usage instructions.
+# Details:
+Draft a README file with quick-start instructions and details on using the Nix flake. Write a demo script that guides users through creating a project and completing a Unit.
+
+# Test Strategy:
+Review the README and demo script for clarity and completeness. Ensure that following the instructions leads to a successful setup and execution of the demo.

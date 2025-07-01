@@ -1,0 +1,11 @@
+# Task ID: 4
+# Title: Implement Resource and Task Generation
+# Status: pending
+# Dependencies: 3
+# Priority: high
+# Description: Develop functionality to generate resources and engage tasks for each Unit.
+# Details:
+Use the Resource Curator Agent to populate each Unit with at least one video link and one reading link. Implement the Engage Task Generator to add a concise task to each Unit. Ensure links are Obsidian-compatible.
+
+# Test Strategy:
+Verify that each Unit contains the required number of resources and an engage task. Check the validity of links and the format of tasks.

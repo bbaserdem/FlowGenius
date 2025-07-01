@@ -1,0 +1,11 @@
+# Task ID: 3
+# Title: Develop New Project Command
+# Status: pending
+# Dependencies: 2
+# Priority: high
+# Description: Create the 'flowgenius new' command to initialize a new learning project.
+# Details:
+Implement the 'flowgenius new' command to prompt the user for a topic and optional 'why'. Generate a project folder under projects_root with a unique ID. Scaffold at least 3 Units and generate toc.md and unitXX.md files using the Topic Scaffolder Agent.
+
+# Test Strategy:
+Execute the 'flowgenius new' command and check that a new project folder is created with the correct structure and files.

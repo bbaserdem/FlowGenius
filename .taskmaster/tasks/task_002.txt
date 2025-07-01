@@ -1,0 +1,11 @@
+# Task ID: 2
+# Title: Implement Config Wizard
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Develop the CLI command 'flowgenius wizard' to guide users through initial configuration setup.
+# Details:
+Use Click or Typer to create a CLI command that prompts the user for configuration details such as openai_key_path, projects_root, link_style, and default_model. Store these configurations in a YAML file located at $XDG_CONFIG_HOME/flowgenius/config.yaml.
+
+# Test Strategy:
+Run the 'flowgenius wizard' command and verify that a valid config.yaml file is created with the correct user inputs.

@@ -1,0 +1,11 @@
+# Task ID: 6
+# Title: Implement Progress Tracking
+# Status: pending
+# Dependencies: 5
+# Priority: medium
+# Description: Develop functionality to track and update learning progress.
+# Details:
+Create a State Store to maintain a state.json file in each project folder. Implement the 'unit --mark-done' command to update the status of Units in both state.json and the corresponding Markdown files.
+
+# Test Strategy:
+Test the 'unit --mark-done' command to ensure it updates the state.json and Markdown files accurately.

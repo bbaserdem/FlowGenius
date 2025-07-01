@@ -1,0 +1,139 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup Project Repository",
+        "description": "Initialize the project repository with necessary configurations and dependencies.",
+        "details": "Create a new Git repository for FlowGenius. Set up the project structure with directories for CLI commands, agents, and data models. Initialize a Nix flake for environment management. Add dependencies such as openai, langchain-core, click, platformdirs, pydantic-settings, ruamel.yaml, and textual (optional) to the Nix flake configuration.\n<info added on 2025-07-01T17:40:55.593Z>\nInitial assessment of Task 1 progress:\n\n✅ COMPLETED ITEMS:\n- Git repository is already initialized (confirmed by git status)\n- Nix flake is excellently configured with uv2nix integration, Python 3.13, and proper development shell\n- Basic Python project structure exists with src/flowgenius/ and pyproject.toml\n- Basic CLI entry point is defined (flowgenius = \"flowgenius:main\")\n\n❌ REMAINING WORK:\n- Add required dependencies to pyproject.toml: openai, langchain-core, click, platformdirs, pydantic-settings, ruamel.yaml, textual (optional)\n- Create project directories for CLI commands, agents, and data models\n- Update uv.lock with new dependencies\n- Verify 'nix develop' works with all dependencies\n\nNEXT STEPS:\n1. Add dependencies to pyproject.toml\n2. Create proper directory structure\n3. Update dependencies and test environment\n</info added on 2025-07-01T17:40:55.593Z>\n<info added on 2025-07-01T17:44:59.252Z>\n✅ TASK 1 COMPLETED SUCCESSFULLY!\n\nFinal completion status:\n\n✅ Git repository: Already initialized and working\n✅ Nix flake: Excellently configured with uv2nix integration \n✅ Python project structure: Created with proper package layout\n✅ Dependencies added to pyproject.toml:\n  - openai>=1.0.0\n  - langchain-core>=0.3.0\n  - click>=8.0.0\n  - platformdirs>=4.0.0\n  - pydantic-settings>=2.0.0\n  - ruamel.yaml>=0.18.0\n  - textual>=0.80.0\n✅ Project directories created:\n  - src/flowgenius/cli/ (CLI commands)\n  - src/flowgenius/agents/ (AI agents)\n  - src/flowgenius/models/ (data models)\n✅ uv.lock updated: All 47 packages resolved and locked\n✅ Environment tested: direnv reload successful, all dependencies importable\n✅ CLI entry point: Working and executable via 'flowgenius' command\n\nThe project repository is fully set up and ready for development of the next tasks!\n</info added on 2025-07-01T17:44:59.252Z>",
+        "testStrategy": "Verify that the repository can be cloned and the environment can be set up using 'nix develop'. Ensure all dependencies are correctly installed.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Implement Config Wizard",
+        "description": "Develop the CLI command 'flowgenius wizard' to guide users through initial configuration setup.",
+        "details": "Use Click or Typer to create a CLI command that prompts the user for configuration details such as openai_key_path, projects_root, link_style, and default_model. Store these configurations in a YAML file located at $XDG_CONFIG_HOME/flowgenius/config.yaml.",
+        "testStrategy": "Run the 'flowgenius wizard' command and verify that a valid config.yaml file is created with the correct user inputs.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Develop New Project Command",
+        "description": "Create the 'flowgenius new' command to initialize a new learning project.",
+        "details": "Implement the 'flowgenius new' command to prompt the user for a topic and optional 'why'. Generate a project folder under projects_root with a unique ID. Scaffold at least 3 Units and generate toc.md and unitXX.md files using the Topic Scaffolder Agent.",
+        "testStrategy": "Execute the 'flowgenius new' command and check that a new project folder is created with the correct structure and files.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Implement Resource and Task Generation",
+        "description": "Develop functionality to generate resources and engage tasks for each Unit.",
+        "details": "Use the Resource Curator Agent to populate each Unit with at least one video link and one reading link. Implement the Engage Task Generator to add a concise task to each Unit. Ensure links are Obsidian-compatible.",
+        "testStrategy": "Verify that each Unit contains the required number of resources and an engage task. Check the validity of links and the format of tasks.",
+        "priority": "high",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Create Markdown Renderer",
+        "description": "Implement the Renderer component to output Markdown files for projects.",
+        "details": "Develop the Renderer to write toc.md and unitXX.md files, ensuring they respect the specified link_style. Use Python's file handling to write Markdown content to the appropriate project directories.",
+        "testStrategy": "Check that the Markdown files are correctly formatted and saved in the project folder. Validate the link styles against Obsidian compatibility.",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Implement Progress Tracking",
+        "description": "Develop functionality to track and update learning progress.",
+        "details": "Create a State Store to maintain a state.json file in each project folder. Implement the 'unit --mark-done' command to update the status of Units in both state.json and the corresponding Markdown files.",
+        "testStrategy": "Test the 'unit --mark-done' command to ensure it updates the state.json and Markdown files accurately.",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Develop Refinement Loop",
+        "description": "Implement the 'unit --refine' command to allow users to refine Units based on feedback.",
+        "details": "Use the Conversation Manager and LangChain to re-call agents and update Units based on user feedback. Ensure the refined content is saved back to the appropriate files.",
+        "testStrategy": "Run the 'unit --refine' command and verify that Units are updated correctly based on user input.",
+        "priority": "medium",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Ensure Offline-safe Storage",
+        "description": "Ensure all data storage is local and does not rely on cloud services.",
+        "details": "Verify that all files are stored locally and that the application functions without internet connectivity, except for OpenAI API calls. Ensure that secrets are injected via file path as specified.",
+        "testStrategy": "Test the application in an offline environment to confirm that all functionalities except OpenAI API calls work as expected.",
+        "priority": "medium",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "Setup Nix Dev Shell",
+        "description": "Configure a Nix development shell for reproducible environments.",
+        "details": "Create a Nix flake configuration that includes all necessary dependencies and environment settings. Ensure that running 'nix develop' sets up the environment correctly.",
+        "testStrategy": "Run 'nix develop' on a clean machine and verify that the environment is set up with all dependencies installed.",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Write README and Demo Script",
+        "description": "Document the project setup and usage instructions.",
+        "details": "Draft a README file with quick-start instructions and details on using the Nix flake. Write a demo script that guides users through creating a project and completing a Unit.",
+        "testStrategy": "Review the README and demo script for clarity and completeness. Ensure that following the instructions leads to a successful setup and execution of the demo.",
+        "priority": "medium",
+        "dependencies": [
+          9
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-07-01T17:03:10.935Z",
+      "updated": "2025-07-01T17:45:08.959Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

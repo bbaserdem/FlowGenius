@@ -1,0 +1,11 @@
+# Task ID: 5
+# Title: Create Markdown Renderer
+# Status: pending
+# Dependencies: 4
+# Priority: medium
+# Description: Implement the Renderer component to output Markdown files for projects.
+# Details:
+Develop the Renderer to write toc.md and unitXX.md files, ensuring they respect the specified link_style. Use Python's file handling to write Markdown content to the appropriate project directories.
+
+# Test Strategy:
+Check that the Markdown files are correctly formatted and saved in the project folder. Validate the link styles against Obsidian compatibility.

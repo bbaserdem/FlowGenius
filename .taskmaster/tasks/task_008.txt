@@ -1,0 +1,11 @@
+# Task ID: 8
+# Title: Ensure Offline-safe Storage
+# Status: pending
+# Dependencies: 7
+# Priority: medium
+# Description: Ensure all data storage is local and does not rely on cloud services.
+# Details:
+Verify that all files are stored locally and that the application functions without internet connectivity, except for OpenAI API calls. Ensure that secrets are injected via file path as specified.
+
+# Test Strategy:
+Test the application in an offline environment to confirm that all functionalities except OpenAI API calls work as expected.
