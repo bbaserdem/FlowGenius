@@ -247,6 +247,204 @@ class TestMarkdownRenderer:
         assert "[[unit-1.md|Unit unit-1]]" in content
 
 
+class TestYAMLEscaping:
+    """Test cases for YAML frontmatter escaping functionality."""
+
+    def test_escape_yaml_value_simple_strings(self, obsidian_config: FlowGeniusConfig) -> None:
+        """Test that simple strings are not unnecessarily quoted."""
+        renderer = MarkdownRenderer(obsidian_config)
+        
+        # Simple strings should remain unquoted
+        test_cases = [
+            ("simple", "simple"),
+            ("hello-world", "hello-world"),
+            ("unit-1", "unit-1"),
+            ("pending", "pending"),
+            ("CamelCase", "CamelCase"),
+            ("snake_case", "snake_case"),
+        ]
+        
+        for input_val, expected in test_cases:
+            result = renderer._escape_yaml_value(input_val)
+            assert result == expected, f"Expected {expected}, got {result} for input {input_val}"
+
+    def test_escape_yaml_value_special_characters(self, obsidian_config: FlowGeniusConfig) -> None:
+        """Test that strings with special characters are properly quoted."""
+        renderer = MarkdownRenderer(obsidian_config)
+        
+        # Test specific characters that should trigger quoting
+        test_cases = [
+            "String with: colon",
+            'String with "quotes"',
+            "String with 'single quotes'",
+            "String with # hash",
+            "String with & ampersand", 
+            "String with | pipe",
+            "String with > greater",
+            "Multi\nline\nstring",
+        ]
+        
+        for input_val in test_cases:
+            result = renderer._escape_yaml_value(input_val)
+            # Check that special characters are handled - either quoted or escaped
+            # The exact format may vary but should not be the raw input for complex strings
+            if any(char in input_val for char in [':', '"', "'", '#', '&', '|', '>', '\n']):
+                # Should be quoted in some way or escaped
+                assert result != input_val or result.startswith("'") or result.startswith('"'), f"String with special chars should be escaped/quoted: {result}"
+
+    def test_escape_yaml_value_reserved_words(self, obsidian_config: FlowGeniusConfig) -> None:
+        """Test that YAML reserved words are properly quoted."""
+        renderer = MarkdownRenderer(obsidian_config)
+        
+        # Test known reserved words
+        reserved_words = ['true', 'false', 'null']  # Core reserved words that should definitely be quoted
+        
+        for word in reserved_words:
+            result = renderer._escape_yaml_value(word)
+            # Should be quoted in some form to prevent interpretation as boolean/null
+            assert result.startswith("'") or "..." in result, f"Reserved word {word} should be quoted, got {result}"
+            
+        # Test case variations for true/false (most important ones)
+        for word in ['true', 'false']:
+            result_upper = renderer._escape_yaml_value(word.upper())
+            assert result_upper.startswith("'") or "..." in result_upper, f"Reserved word {word.upper()} should be quoted"
+
+    def test_escape_yaml_value_numeric_strings(self, obsidian_config: FlowGeniusConfig) -> None:
+        """Test that numeric-looking strings are properly quoted."""
+        renderer = MarkdownRenderer(obsidian_config)
+        
+        # Numeric strings should be quoted to prevent interpretation as numbers
+        numeric_strings = ["123", "3.14", "42", "0", "1.0"]
+        
+        for input_val in numeric_strings:
+            result = renderer._escape_yaml_value(input_val)
+            # Should be quoted in some form to prevent numeric interpretation
+            assert result.startswith("'") or result != input_val, f"Numeric string {input_val} should be quoted, got {result}"
+
+    def test_escape_yaml_value_edge_cases(self, obsidian_config: FlowGeniusConfig) -> None:
+        """Test edge cases for YAML escaping."""
+        renderer = MarkdownRenderer(obsidian_config)
+        
+        # Test None value
+        assert renderer._escape_yaml_value(None) == "null"
+        
+        # Test empty string
+        result = renderer._escape_yaml_value("")
+        assert result == ""  # Empty string should remain empty
+        
+        # Test whitespace-only strings
+        result_spaces = renderer._escape_yaml_value("   ")
+        assert result_spaces.startswith("'") and result_spaces.endswith("'"), "Whitespace-only strings should be quoted"
+        
+        # Test strings with leading/trailing spaces
+        result_leading = renderer._escape_yaml_value(" leading")
+        assert result_leading.startswith("'"), "Strings with leading spaces should be quoted"
+        
+        result_trailing = renderer._escape_yaml_value("trailing ")
+        assert result_trailing.startswith("'"), "Strings with trailing spaces should be quoted"
+
+    def test_escape_yaml_value_non_string_types(self, obsidian_config: FlowGeniusConfig) -> None:
+        """Test that non-string types are properly converted and escaped."""
+        renderer = MarkdownRenderer(obsidian_config)
+        
+        # Test various types
+        test_cases = [
+            (42, "'42'"),  # int becomes quoted string
+            (3.14, "'3.14'"),  # float becomes quoted string  
+            (True, "'True'"),  # bool becomes quoted string
+            (False, "'False'"),  # bool becomes quoted string
+        ]
+        
+        for input_val, expected in test_cases:
+            result = renderer._escape_yaml_value(input_val)
+            assert result == expected, f"Expected {expected}, got {result} for input {input_val} (type: {type(input_val)})"
+
+    def test_yaml_escaping_in_toc_content(self, obsidian_config: FlowGeniusConfig) -> None:
+        """Test that YAML escaping is applied in TOC content generation."""
+        renderer = MarkdownRenderer(obsidian_config)
+        
+        # Create project with problematic characters
+        metadata = ProjectMetadata(
+            id="test-project-123",
+            title='Docker: Learn "advanced" containerization',
+            topic="DevOps & Containers: Complete Guide",
+            motivation='Build production-ready apps with Docker & Kubernetes!',
+            created_at=datetime.now()
+        )
+        
+        project = LearningProject(metadata=metadata, units=[])
+        
+        content = renderer._build_toc_content(project)
+        
+        # Check that problematic values are properly escaped in YAML frontmatter
+        lines = content.split('\n')
+        yaml_section = []
+        in_yaml = False
+        
+        for line in lines:
+            if line.strip() == '---':
+                if not in_yaml:
+                    in_yaml = True
+                else:
+                    break
+            elif in_yaml:
+                yaml_section.append(line)
+        
+        yaml_content = '\n'.join(yaml_section)
+        
+        # Values with colons should be quoted
+        assert "title: 'Docker: Learn \"advanced\" containerization'" in yaml_content
+        assert "topic: 'DevOps & Containers: Complete Guide'" in yaml_content
+        # Values with special chars should be quoted or properly escaped
+        assert "motivation:" in yaml_content  # Should be present and properly escaped
+
+    def test_yaml_escaping_in_unit_content(self, obsidian_config: FlowGeniusConfig) -> None:
+        """Test that YAML escaping is applied in unit content generation."""
+        renderer = MarkdownRenderer(obsidian_config)
+        
+        # Create unit with problematic characters
+        unit = LearningUnit(
+            id="unit-1",
+            title='Introduction: Docker "Basics" & Setup',
+            description="Learn Docker fundamentals",
+            learning_objectives=["Understand what Docker is & why it matters"],
+            status="in-progress",
+            estimated_duration="2-3 hours: hands-on learning"
+        )
+        
+        # Create project with problematic title
+        metadata = ProjectMetadata(
+            id="docker-project",
+            title='Docker: Complete "Production" Guide',
+            topic="Docker",
+            created_at=datetime.now()
+        )
+        project = LearningProject(metadata=metadata, units=[unit])
+        
+        content = renderer._build_unit_content(unit, project)
+        
+        # Check that problematic values are properly escaped in YAML frontmatter
+        lines = content.split('\n')
+        yaml_section = []
+        in_yaml = False
+        
+        for line in lines:
+            if line.strip() == '---':
+                if not in_yaml:
+                    in_yaml = True
+                else:
+                    break
+            elif in_yaml:
+                yaml_section.append(line)
+        
+        yaml_content = '\n'.join(yaml_section)
+        
+        # Check that values with special characters are properly quoted
+        assert "title: 'Introduction: Docker \"Basics\" & Setup'" in yaml_content
+        assert "project: 'Docker: Complete \"Production\" Guide'" in yaml_content
+        assert "estimated_duration: '2-3 hours: hands-on learning'" in yaml_content
+
+
 class TestLinkStyleHandling:
     """Test cases specifically for link style handling."""
     

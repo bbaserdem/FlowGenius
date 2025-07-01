@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 import json
 from datetime import datetime
+from ruamel.yaml import YAML
 
 from .config import FlowGeniusConfig
 from .project import LearningProject, LearningUnit, LearningResource, EngageTask
@@ -35,6 +36,46 @@ class MarkdownRenderer:
             config: FlowGenius configuration object
         """
         self.config = config
+    
+    def _escape_yaml_value(self, value: Any) -> str:
+        """
+        Properly escape a value for YAML frontmatter.
+        
+        Args:
+            value: The value to escape (string, int, bool, etc.)
+            
+        Returns:
+            YAML-safe string representation
+        """
+        if value is None:
+            return "null"
+        
+        # Convert to string if not already
+        if not isinstance(value, str):
+            value = str(value)
+        
+        # Check if the string contains special YAML characters that need quoting
+        special_chars = [':', '"', "'", '\n', '\r', '\t', '[', ']', '{', '}', '|', '>', '#', '&', '*', '!', '%', '@', '`']
+        needs_quoting = (
+            any(char in value for char in special_chars) or
+            value.startswith(' ') or
+            value.endswith(' ') or
+            value.lower() in ['true', 'false', 'null', 'yes', 'no', 'on', 'off'] or
+            (value.replace('.', '').replace('-', '').isdigit() and '.' in value) or  # looks like a number
+            value.isdigit()  # is a number
+        )
+        
+        if needs_quoting:
+            # Use ruamel.yaml to properly escape the string
+            from io import StringIO
+            yaml = YAML()
+            yaml.preserve_quotes = True
+            yaml.width = 4096
+            stream = StringIO()
+            yaml.dump(value, stream)
+            return stream.getvalue().strip()
+        
+        return value
     
     def render_project_files(
         self, 
@@ -145,7 +186,7 @@ class MarkdownRenderer:
                     in_frontmatter = False
                 updated_lines.append(line)
             elif in_frontmatter and line.startswith('status:'):
-                updated_lines.append(f"status: {new_status}")
+                updated_lines.append(f"status: {self._escape_yaml_value(new_status)}")
             else:
                 updated_lines.append(line)
         
@@ -181,17 +222,17 @@ class MarkdownRenderer:
         # YAML frontmatter
         lines.extend([
             "---",
-            f"title: {project.title}",
-            f"topic: {project.metadata.topic}",
+            f"title: {self._escape_yaml_value(project.title)}",
+            f"topic: {self._escape_yaml_value(project.metadata.topic)}",
             f"created: {project.metadata.created_at.isoformat()}",
-            f"project_id: {project.project_id}",
+            f"project_id: {self._escape_yaml_value(project.project_id)}",
         ])
         
         if project.metadata.motivation:
-            lines.append(f"motivation: {project.metadata.motivation}")
+            lines.append(f"motivation: {self._escape_yaml_value(project.metadata.motivation)}")
         
         if project.metadata.estimated_total_time:
-            lines.append(f"estimated_time: {project.metadata.estimated_total_time}")
+            lines.append(f"estimated_time: {self._escape_yaml_value(project.metadata.estimated_total_time)}")
         
         # Add content generation status if available
         if unit_content_map:
@@ -309,17 +350,17 @@ class MarkdownRenderer:
         # YAML frontmatter
         lines.extend([
             "---",
-            f"title: {unit.title}",
-            f"unit_id: {unit.id}",
-            f"project: {project.title}",
-            f"status: {unit.status}",
+            f"title: {self._escape_yaml_value(unit.title)}",
+            f"unit_id: {self._escape_yaml_value(unit.id)}",
+            f"project: {self._escape_yaml_value(project.title)}",
+            f"status: {self._escape_yaml_value(unit.status)}",
         ])
         
         if unit.estimated_duration:
-            lines.append(f"estimated_duration: {unit.estimated_duration}")
+            lines.append(f"estimated_duration: {self._escape_yaml_value(unit.estimated_duration)}")
         
         if unit.prerequisites:
-            lines.append(f"prerequisites: {unit.prerequisites}")
+            lines.append(f"prerequisites: {self._escape_yaml_value(unit.prerequisites)}")
         
         # Add content generation metadata
         if generated_content:
