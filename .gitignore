@@ -1,3 +1,18 @@
+# Gitignore things
+
+# Secrets
+.env*
+.gcloud/
+GoogleService-Info.plist
+google-services.json
+firebase_app_id_file.json
+
+# Nix and direnv related files
+!.envrc
+.direnv/
+result
+result-*
+
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -6,5 +21,21 @@ dist/
 wheels/
 *.egg-info
 
-# Virtual environments
+# UV Virtual environments
 .venv
+
+# Generic
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate_working_dir/
+Thumbs.db
+*.tmp
+*.temp
+*.cache
