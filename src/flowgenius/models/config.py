@@ -7,7 +7,7 @@ including user preferences and system settings.
 
 from pathlib import Path
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from platformdirs import user_config_dir
 
 
@@ -36,9 +36,7 @@ class FlowGeniusConfig(BaseModel):
         description="Default OpenAI model to use for content generation"
     )
 
-    class Config:
-        """Pydantic model configuration."""
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 def get_config_path() -> Path:

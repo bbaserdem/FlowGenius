@@ -3,6 +3,7 @@ FlowGenius Markdown Renderer
 
 This module provides dedicated rendering functionality for generating
 markdown files with integrated content from resource and task generation agents.
+Enhanced with state.json integration for accurate progress tracking.
 """
 
 from pathlib import Path
@@ -13,6 +14,7 @@ from ruamel.yaml import YAML
 
 from .config import FlowGeniusConfig
 from .project import LearningProject, LearningUnit, LearningResource, EngageTask
+from .state_store import StateStore, create_state_store
 from ..agents.content_generator import GeneratedContent
 
 
@@ -24,7 +26,7 @@ class MarkdownRenderer:
     - Table of contents (toc.md) generation
     - Individual unit files (unitXX.md) with integrated content
     - README files for projects
-    - Progress tracking and status updates
+    - Progress tracking and status updates with state.json integration
     - Link style configuration (Obsidian vs standard markdown)
     """
     
@@ -36,6 +38,122 @@ class MarkdownRenderer:
             config: FlowGenius configuration object
         """
         self.config = config
+        self._state_store: Optional[StateStore] = None
+    
+    def _get_state_store(self, project_dir: Path) -> StateStore:
+        """
+        Get or create a StateStore for the given project directory.
+        
+        Args:
+            project_dir: Path to the project directory
+            
+        Returns:
+            StateStore instance for the project
+        """
+        if self._state_store is None or self._state_store.project_dir != project_dir:
+            self._state_store = create_state_store(project_dir)
+        return self._state_store
+    
+    def _get_unit_state_info(self, unit: LearningUnit, project_dir: Path) -> Dict[str, Any]:
+        """
+        Get state information for a unit, combining project model with state.json data.
+        
+        Args:
+            unit: The learning unit
+            project_dir: Path to the project directory
+            
+        Returns:
+            Dictionary with current status, completion date, and other state info
+        """
+        try:
+            state_store = self._get_state_store(project_dir)
+            state = state_store.load_state()
+            unit_state = state.get_unit_state(unit.id)
+            
+            if unit_state:
+                return {
+                    "status": unit_state.status,
+                    "started_at": unit_state.started_at,
+                    "completed_at": unit_state.completed_at,
+                    "progress_notes": unit_state.progress_notes
+                }
+            else:
+                # Fall back to project model data
+                return {
+                    "status": unit.status,
+                    "started_at": None,
+                    "completed_at": None,
+                    "progress_notes": []
+                }
+        except Exception:
+            # If state loading fails, fall back to project model
+            return {
+                "status": unit.status,
+                "started_at": None,
+                "completed_at": None,
+                "progress_notes": []
+            }
+    
+    def sync_with_state(self, project: LearningProject, project_dir: Path) -> None:
+        """
+        Synchronize all unit markdown files with current state.json data.
+        
+        This method ensures that all unit files reflect the current status
+        and completion information stored in state.json.
+        
+        Args:
+            project: The learning project
+            project_dir: Path to the project directory
+        """
+        try:
+            state_store = self._get_state_store(project_dir)
+            # Initialize state store with project units if needed
+            state_store.initialize_from_project(project)
+            
+            units_dir = project_dir / "units"
+            if not units_dir.exists():
+                return
+            
+            # Update each unit file with current state data
+            for unit in project.units:
+                unit_file = units_dir / f"{unit.id}.md"
+                if unit_file.exists():
+                    state_info = self._get_unit_state_info(unit, project_dir)
+                    self.update_unit_progress(
+                        unit_file, 
+                        state_info["status"], 
+                        state_info["completed_at"]
+                    )
+        except Exception as e:
+            # Log the error but don't fail the operation
+            # In a production environment, you might want to use proper logging
+            pass
+    
+    def render_project_files_with_state(
+        self, 
+        project: LearningProject, 
+        project_dir: Path,
+        unit_content_map: Optional[Dict[str, GeneratedContent]] = None,
+        progress_callback: Optional[callable] = None
+    ) -> None:
+        """
+        Render all project files with state.json integration.
+        
+        This is a state-aware version of render_project_files that ensures
+        all rendered content reflects the current state.json data.
+        
+        Args:
+            project: The learning project to render
+            project_dir: Directory where files should be created
+            unit_content_map: Optional mapping of unit IDs to generated content
+            progress_callback: Optional callback for progress updates
+        """
+        # Initialize state store with project data
+        state_store = self._get_state_store(project_dir)
+        state_store.initialize_from_project(project)
+        
+        # Use the regular render method (which now uses state-aware content building)
+        self.render_project_files(project, project_dir, unit_content_map, progress_callback)
     
     def _escape_yaml_value(self, value: Any) -> str:
         """
@@ -120,7 +238,7 @@ class MarkdownRenderer:
             
             unit_file = project_dir / "units" / f"{unit.id}.md"
             generated_content = unit_content_map.get(unit.id) if unit_content_map else None
-            content = self._build_unit_content(unit, project, generated_content)
+            content = self._build_unit_content(unit, project, generated_content, project_dir)
             unit_file.write_text(content)
         
         # Final step: Write README
@@ -134,21 +252,27 @@ class MarkdownRenderer:
         unit: LearningUnit, 
         project: LearningProject,
         output_path: Path,
-        generated_content: Optional[GeneratedContent] = None
+        generated_content: Optional[GeneratedContent] = None,
+        project_dir: Optional[Path] = None
     ) -> None:
         """
-        Render a single unit file with optional generated content.
+        Render a single unit file with optional generated content and state integration.
         
         Args:
             unit: The learning unit to render
             project: The parent project for context
             output_path: Where to save the unit file
             generated_content: Optional curated resources and tasks
+            project_dir: Optional project directory for state integration
         """
         # Ensure parent directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
-        content = self._build_unit_content(unit, project, generated_content)
+        # If project_dir not provided, try to infer it from output_path
+        if project_dir is None:
+            project_dir = output_path.parent.parent
+        
+        content = self._build_unit_content(unit, project, generated_content, project_dir)
         output_path.write_text(content)
     
     def update_unit_progress(
@@ -208,16 +332,27 @@ class MarkdownRenderer:
     ) -> None:
         """Write the table of contents markdown file."""
         toc_file = project_dir / "toc.md"
-        content = self._build_toc_content(project, unit_content_map)
+        content = self._build_toc_content(project, unit_content_map, project_dir)
         toc_file.write_text(content)
     
     def _build_toc_content(
         self, 
         project: LearningProject,
-        unit_content_map: Optional[Dict[str, GeneratedContent]] = None
+        unit_content_map: Optional[Dict[str, GeneratedContent]] = None,
+        project_dir: Optional[Path] = None
     ) -> str:
-        """Build the table of contents markdown content."""
+        """Build the table of contents markdown content with state integration."""
         lines = []
+        
+        # Get progress summary from state if available
+        progress_summary = None
+        if project_dir:
+            try:
+                state_store = self._get_state_store(project_dir)
+                state_store.initialize_from_project(project)
+                progress_summary = state_store.get_progress_summary()
+            except Exception:
+                pass
         
         # YAML frontmatter
         lines.extend([
@@ -239,6 +374,10 @@ class MarkdownRenderer:
             generated_units = len([u for u in unit_content_map.values() if u.generation_success])
             total_units = len(project.units)
             lines.append(f"content_generated: {generated_units}/{total_units} units")
+        
+        # Add progress summary from state if available
+        if progress_summary:
+            lines.append(f"progress: {progress_summary['completed_units']}/{progress_summary['total_units']} completed ({progress_summary['completion_percentage']:.1f}%)")
         
         lines.extend([
             "---",
@@ -265,7 +404,13 @@ class MarkdownRenderer:
         for unit in project.units:
             unit_link = self._format_link(f"units/{unit.id}.md", unit.title)
             duration = unit.estimated_duration or "TBD"
-            status = unit.status.title()
+            
+            # Use state data for status if available
+            if project_dir:
+                state_info = self._get_unit_state_info(unit, project_dir)
+                status = state_info["status"].title()
+            else:
+                status = unit.status.title()
             
             # Add resource and task counts if available
             resources_count = "TBD"
@@ -288,6 +433,7 @@ class MarkdownRenderer:
             "├── toc.md              # This file - project overview",
             "├── README.md           # Quick start guide", 
             "├── project.json        # Project metadata",
+            "├── state.json          # Progress tracking state",
             "├── units/              # Learning unit files",
         ])
         
@@ -335,17 +481,28 @@ class MarkdownRenderer:
         for unit in project.units:
             unit_file = units_dir / f"{unit.id}.md"
             generated_content = unit_content_map.get(unit.id) if unit_content_map else None
-            content = self._build_unit_content(unit, project, generated_content)
+            content = self._build_unit_content(unit, project, generated_content, project_dir)
             unit_file.write_text(content)
     
     def _build_unit_content(
         self, 
         unit: LearningUnit, 
         project: LearningProject,
-        generated_content: Optional[GeneratedContent] = None
+        generated_content: Optional[GeneratedContent] = None,
+        project_dir: Optional[Path] = None
     ) -> str:
-        """Build the content for a unit markdown file."""
+        """Build the content for a unit markdown file with state integration."""
         lines = []
+        
+        # Get state information if project_dir is provided
+        state_info = None
+        if project_dir:
+            state_info = self._get_unit_state_info(unit, project_dir)
+        
+        # Use state data or fall back to unit data
+        current_status = state_info["status"] if state_info else unit.status
+        completed_at = state_info["completed_at"] if state_info else None
+        started_at = state_info["started_at"] if state_info else None
         
         # YAML frontmatter
         lines.extend([
@@ -353,7 +510,7 @@ class MarkdownRenderer:
             f"title: {self._escape_yaml_value(unit.title)}",
             f"unit_id: {self._escape_yaml_value(unit.id)}",
             f"project: {self._escape_yaml_value(project.title)}",
-            f"status: {self._escape_yaml_value(unit.status)}",
+            f"status: {self._escape_yaml_value(current_status)}",
         ])
         
         if unit.estimated_duration:
@@ -361,6 +518,12 @@ class MarkdownRenderer:
         
         if unit.prerequisites:
             lines.append(f"prerequisites: {self._escape_yaml_value(unit.prerequisites)}")
+        
+        # Add state-based timestamps if available
+        if started_at:
+            lines.append(f"started_date: {started_at.isoformat()}")
+        if completed_at:
+            lines.append(f"completed_date: {completed_at.isoformat()}")
         
         # Add content generation metadata
         if generated_content:
@@ -451,6 +614,18 @@ class MarkdownRenderer:
                 "",
             ])
             for note in generated_content.generation_notes:
+                lines.append(f"- {note}")
+            lines.append("")
+        
+        # Progress notes from state (if any)
+        if state_info and state_info["progress_notes"]:
+            lines.extend([
+                "## Progress Notes",
+                "",
+                "*Notes from your learning progress:*",
+                "",
+            ])
+            for note in state_info["progress_notes"]:
                 lines.append(f"- {note}")
             lines.append("")
         
