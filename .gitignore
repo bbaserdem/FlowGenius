@@ -1,5 +1,8 @@
 # Gitignore things
 
+# Large files
+*.webm
+
 # Secrets
 .env*
 .gcloud/

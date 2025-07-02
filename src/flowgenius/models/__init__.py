@@ -13,6 +13,7 @@ from .project import (
 )
 from .project_generator import ProjectGenerator
 from .renderer import MarkdownRenderer
+from .state_store import StateStore, ProjectState, UnitState, create_state_store
 
 __all__ = [
     # Configuration
@@ -33,5 +34,11 @@ __all__ = [
     
     # Project generation
     "ProjectGenerator",
-    "MarkdownRenderer"
+    "MarkdownRenderer",
+    
+    # Progress tracking
+    "StateStore",
+    "ProjectState", 
+    "UnitState",
+    "create_state_store"
 ] 

@@ -293,8 +293,51 @@
         "dependencies": [
           5
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "in-progress",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create State Store Class",
+            "description": "Develop a State Store class to manage state.json files in each project folder.",
+            "dependencies": [],
+            "details": "Design and implement a State Store class that handles reading from and writing to a state.json file located in each project folder. Ensure the class can initialize the state file if it doesn't exist and provide methods to update the state of units.\n<info added on 2025-07-02T14:39:56.222Z>\n✅ **SUBTASK 6.1 COMPLETED SUCCESSFULLY**\n\n**State Store Implementation Summary:**\n\n**✅ Core Classes Created:**\n- `UnitState` - Pydantic model for individual unit progress with timestamps and status\n- `ProjectState` - Complete project state with unit tracking and progress summary methods\n- `StateStore` - Main class for managing state.json files in project directories\n\n**✅ Key Features Implemented:**\n- **state.json Management**: Load/save state to JSON files with proper datetime serialization\n- **Unit Status Tracking**: Update unit status (pending → in-progress → completed) with timestamps\n- **Progress Summaries**: Calculate completion percentages and unit counts\n- **Project Integration**: Initialize state from existing LearningProject models\n- **Error Handling**: Proper exception handling for file I/O and invalid data\n- **Automatic Timestamps**: Track when units are started and completed\n\n**✅ Comprehensive API:**\n- `load_state()` - Load state.json or create default if missing\n- `save_state()` - Save state with proper datetime serialization\n- `update_unit_status()` - Update specific unit status and save\n- `get_unit_status()` - Get current status of a unit\n- `initialize_from_project()` - Initialize from LearningProject, preserving existing progress\n- `get_progress_summary()` - Get completion statistics\n\n**✅ Testing Verified:**\n- Basic state creation and file management ✅\n- Unit status updates and persistence ✅\n- Progress tracking and summaries ✅\n- Project integration and initialization ✅\n- Error handling and edge cases ✅\n\n**✅ Integration Ready:**\n- Exported in `models/__init__.py`\n- Follows established codebase patterns\n- Compatible with existing project models\n- Ready for CLI integration\n\n**Next Steps:**\nReady to move to Subtask 6.2 - Implement 'unit --mark-done' CLI Command\n</info added on 2025-07-02T14:39:56.222Z>",
+            "status": "done",
+            "testStrategy": "Write unit tests to verify that the State Store class correctly reads, writes, and initializes state.json files."
+          },
+          {
+            "id": 2,
+            "title": "Implement 'unit --mark-done' CLI Command",
+            "description": "Develop the 'unit --mark-done' command to update the status of units in state.json and corresponding Markdown files.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a CLI command that accepts a unit identifier and marks it as done. Use the State Store class to update the state.json file and leverage the existing MarkdownRenderer methods to update the Markdown files.\n<info added on 2025-07-02T16:17:11.887Z>\n✅ **SUBTASK 6.2 COMPLETED SUCCESSFULLY**\n\n**'unit --mark-done' CLI Command Implementation Summary:**\n\n**✅ Complete CLI Module Created:**\n- `src/flowgenius/cli/unit.py` - Full unit management CLI with comprehensive commands\n- Registered in main CLI (`src/flowgenius/cli/main.py`)\n- Follows established codebase patterns and conventions\n\n**✅ Core Commands Implemented:**\n- **`unit mark-done <unit_id>`** - Main requirement: Mark units as completed\n  - Updates both state.json and markdown files\n  - Optional completion date and notes support\n  - Dry-run capability for preview\n  - Progress summary display\n- **`unit status [--all | unit_id]`** - View unit status and progress\n- **`unit start <unit_id>`** - Mark units as in-progress\n\n**✅ Key Features:**\n- **Automatic Project Detection**: Finds project directory by searching for project.json\n- **State Store Integration**: Proper initialization with all project units\n- **MarkdownRenderer Integration**: Updates unit markdown files with status and completion dates\n- **Progress Tracking**: Accurate completion percentages and statistics\n- **Error Handling**: Comprehensive error messages and validation\n- **User Experience**: Colored output, emojis, helpful tips, and confirmation prompts\n\n**✅ Integration Verified:**\n- **state.json Management**: Creates and updates state files correctly\n- **Markdown File Updates**: Updates unit frontmatter with status and completion dates\n- **Progress Calculations**: Accurate tracking (e.g., \"1/2 units completed (50.0%)\")\n- **Project Initialization**: Ensures state store includes all project units\n- **Directory Navigation**: Automatic project detection from any subdirectory\n\n**✅ Comprehensive Testing:**\n- All CLI commands tested and working\n- State Store integration verified\n- MarkdownRenderer integration confirmed\n- Error handling validated\n- Progress summary accuracy confirmed\n- Edge cases handled properly\n\n**✅ User-Friendly Features:**\n- Intuitive command structure following established patterns\n- Helpful error messages with actionable tips\n- Confirmation prompts for destructive actions\n- Dry-run capability for safety\n- Rich progress feedback with emojis and colored output\n- Automatic congratulations when all units completed\n\n**Integration Complete:**\nThe 'unit --mark-done' command and full unit management suite is ready for production use!\n</info added on 2025-07-02T16:17:11.887Z>",
+            "status": "done",
+            "testStrategy": "Create integration tests to ensure the command updates both state.json and Markdown files correctly."
+          },
+          {
+            "id": 3,
+            "title": "Integrate State Updates with MarkdownRenderer",
+            "description": "Ensure that updates to state.json are reflected in the MarkdownRenderer's progress tracking.",
+            "dependencies": [
+              2
+            ],
+            "details": "Modify the MarkdownRenderer to listen for changes in the state.json file and update its internal tracking of unit progress accordingly. Ensure that any changes made via the CLI command are accurately reflected in the rendered Markdown output.",
+            "status": "pending",
+            "testStrategy": "Test that changes in state.json are correctly reflected in the Markdown output by the renderer."
+          },
+          {
+            "id": 4,
+            "title": "Add Comprehensive Testing for Progress Tracking",
+            "description": "Develop a suite of tests to cover the entire progress tracking workflow, ensuring robustness and reliability.",
+            "dependencies": [
+              3
+            ],
+            "details": "Create comprehensive tests that cover all aspects of the progress tracking functionality, including edge cases and error handling. Ensure that the tests validate the integration between the State Store, CLI command, and MarkdownRenderer.",
+            "status": "pending",
+            "testStrategy": "Implement end-to-end tests that simulate user interactions with the CLI and verify the correct updates in both state.json and Markdown files."
+          }
+        ]
       },
       {
         "id": 7,
@@ -332,7 +375,7 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -351,7 +394,7 @@
     ],
     "metadata": {
       "created": "2025-07-01T17:03:10.935Z",
-      "updated": "2025-07-01T23:02:03.183Z",
+      "updated": "2025-07-02T16:17:19.450Z",
       "description": "Tasks for master context"
     }
   }
