@@ -448,4 +448,228 @@ def start(unit_id: str) -> None:
         
     except Exception as e:
         click.echo(f"❌ Error updating unit: {e}")
-        raise click.Abort() 
+        raise click.Abort()
+
+
+@unit.command("refine")
+@click.argument('unit_id')
+@click.option(
+    '--dry-run',
+    is_flag=True,
+    help='Show what would be changed without applying refinements'
+)
+@click.option(
+    '--no-backup',
+    is_flag=True,
+    help='Skip creating backup before refinement (not recommended)'
+)
+def refine(unit_id: str, dry_run: bool, no_backup: bool) -> None:
+    """
+    Refine a learning unit based on your feedback.
+    
+    This command starts an interactive session where you can provide feedback
+    about the unit content, resources, tasks, or difficulty level. The AI will
+    analyze your feedback and apply appropriate refinements.
+    
+    Examples:
+        flowgenius unit refine unit-1
+        flowgenius unit refine unit-2 --dry-run
+    """
+    # Find the current project directory
+    project_dir = _find_project_directory()
+    if not project_dir:
+        click.echo("❌ No FlowGenius project found in current directory or parent directories.")
+        raise click.Abort()
+    
+    # Load the project
+    project = _load_project_from_directory(project_dir)
+    if not project:
+        click.echo("❌ Unable to load project.json.")
+        raise click.Abort()
+    
+    # Verify the unit exists
+    unit = project.get_unit_by_id(unit_id)
+    if not unit:
+        click.echo(f"❌ Unit '{unit_id}' not found in this project.")
+        click.echo()
+        click.echo("Available units:")
+        for u in project.units:
+            click.echo(f"  📚 {u.id}: {u.title}")
+        raise click.Abort()
+    
+    click.echo(f"🔧 Starting refinement for: {click.style(unit.title, fg='green', bold=True)}")
+    click.echo()
+    
+    try:
+        # Load configuration for OpenAI
+        config = _safe_load_config()
+        if not config:
+            click.echo("❌ Configuration not found. Please run 'flowgenius wizard' to set up your configuration.")
+            raise click.Abort()
+        
+        # Initialize refinement components
+        from openai import OpenAI
+        from ..agents.conversation_manager import create_conversation_manager
+        from ..agents.feedback_processor import create_feedback_processor
+        from ..agents.unit_refinement_engine import create_unit_refinement_engine
+        from ..models.refinement_persistence import create_refinement_persistence
+        from ..models.renderer import MarkdownRenderer
+        
+        # Create OpenAI client
+        openai_key = _get_openai_key(config)
+        if not openai_key:
+            click.echo("❌ OpenAI API key not found. Please check your configuration.")
+            raise click.Abort()
+        
+        client = OpenAI(api_key=openai_key)
+        
+        # Initialize components
+        conversation_mgr = create_conversation_manager(openai_key, config.default_model)
+        feedback_processor = create_feedback_processor(openai_key, config.default_model)
+        refinement_engine = create_unit_refinement_engine(openai_key, config.default_model)
+        
+        # Create renderer and persistence
+        renderer = MarkdownRenderer(config)
+        persistence = create_refinement_persistence(project_dir, renderer)
+        
+        click.echo("💬 Please provide your feedback about this unit.")
+        click.echo("   You can comment on content, resources, tasks, difficulty, or anything else.")
+        click.echo("   Type 'done' when you're finished providing feedback.")
+        click.echo()
+        
+        # Start conversation session
+        session_id = conversation_mgr.start_refinement_session(unit)
+        feedback_collection = []
+        
+        # Interactive feedback collection
+        while True:
+            feedback_text = click.prompt("Your feedback", type=str).strip()
+            
+            if feedback_text.lower() in ['done', 'finish', 'exit', 'quit']:
+                break
+            
+            if not feedback_text:
+                continue
+            
+            click.echo("🤔 Processing your feedback...")
+            
+            # Process feedback
+            ai_response, user_feedback = conversation_mgr.process_user_feedback(session_id, feedback_text)
+            feedback_collection.append(user_feedback)
+            
+            click.echo(f"🤖 AI: {ai_response}")
+            click.echo()
+        
+        if not feedback_collection:
+            click.echo("ℹ️  No feedback provided. Refinement cancelled.")
+            return
+        
+        click.echo(f"📝 Collected {len(feedback_collection)} feedback items. Analyzing...")
+        
+        # Process all feedback
+        processed_feedback_list = []
+        for feedback in feedback_collection:
+            processed = feedback_processor.process_feedback(feedback, unit)
+            processed_feedback_list.append(processed)
+        
+        # Consolidate feedback
+        consolidated_plan = feedback_processor.consolidate_feedback(processed_feedback_list)
+        
+        click.echo()
+        click.echo(f"🎯 Refinement Plan: {consolidated_plan['summary']}")
+        
+        if consolidated_plan['actions']:
+            click.echo("   Actions to apply:")
+            for i, action in enumerate(consolidated_plan['actions'], 1):
+                priority_emoji = "🔥" if action.priority >= 4 else "📋" if action.priority == 3 else "📌"
+                click.echo(f"   {i}. {priority_emoji} {action.description}")
+        
+        if dry_run:
+            click.echo()
+            click.echo("🔍 Dry run complete. No changes were made.")
+            return
+        
+        # Confirm refinement
+        click.echo()
+        if not click.confirm("Apply these refinements?"):
+            click.echo("Refinement cancelled.")
+            return
+        
+        click.echo()
+        click.echo("🔄 Applying refinements...")
+        
+        # Apply refinements for each processed feedback
+        refinement_results = []
+        for processed in processed_feedback_list:
+            result = refinement_engine.refine_unit(unit, processed)
+            refinement_results.append(result)
+        
+        # Save refined project
+        save_results = persistence.save_refined_project(
+            project, 
+            refinement_results, 
+            create_backup=not no_backup
+        )
+        
+        click.echo()
+        
+        # Show results
+        successful_refinements = [r for r in refinement_results if r.success]
+        if successful_refinements:
+            click.echo(f"✅ Successfully refined unit! Applied {len(successful_refinements)} refinement(s).")
+            
+            if save_results.get("backup_created"):
+                backup_info = save_results.get("backup_info")
+                if backup_info:
+                    click.echo(f"💾 Backup created: {backup_info.backup_id}")
+            
+            if save_results.get("project_saved"):
+                click.echo("📁 Project file updated")
+            
+            if save_results.get("markdown_updated"):
+                click.echo("📝 Markdown files updated")
+            
+            # Show what was changed
+            click.echo()
+            click.echo("🔧 Changes applied:")
+            for result in successful_refinements:
+                for action in result.actions_applied:
+                    click.echo(f"   • {action}")
+        else:
+            click.echo("⚠️  No refinements could be applied.")
+        
+        # Show any errors
+        errors = []
+        for result in refinement_results:
+            errors.extend(result.errors)
+        errors.extend(save_results.get("errors", []))
+        
+        if errors:
+            click.echo()
+            click.echo("⚠️  Some issues occurred:")
+            for error in errors:
+                click.echo(f"   • {error}")
+        
+        conversation_mgr.end_session(session_id)
+        
+    except ImportError as e:
+        click.echo(f"❌ Import error: {e}")
+        click.echo("💡 This feature requires additional dependencies. Please ensure all packages are installed.")
+        raise click.Abort()
+    except Exception as e:
+        click.echo(f"❌ Error during refinement: {e}")
+        raise click.Abort()
+
+
+def _get_openai_key(config) -> Optional[str]:
+    """Get OpenAI API key from configuration."""
+    try:
+        if hasattr(config, 'openai_key_path') and config.openai_key_path.exists():
+            with open(config.openai_key_path, 'r') as f:
+                return f.read().strip()
+    except Exception:
+        pass
+    
+    # Try environment variable as fallback
+    import os
+    return os.getenv('OPENAI_API_KEY')

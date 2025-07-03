@@ -293,7 +293,7 @@
         "dependencies": [
           5
         ],
-        "status": "in-progress",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -333,8 +333,8 @@
             "dependencies": [
               3
             ],
-            "details": "Create comprehensive tests that cover all aspects of the progress tracking functionality, including edge cases and error handling. Ensure that the tests validate the integration between the State Store, CLI command, and MarkdownRenderer.\n<info added on 2025-07-02T22:59:04.544Z>\nStarting implementation of comprehensive progress tracking tests.\n\n**Analysis Complete - Understanding the Testing Scope:**\n\nThe progress tracking system consists of 3 main components that need comprehensive testing:\n\n1. **StateStore** (src/flowgenius/models/state_store.py):\n   - UnitState, ProjectState models\n   - StateStore class with load/save operations\n   - State initialization from projects\n   - Progress summaries and unit status updates\n\n2. **CLI Unit Commands** (src/flowgenius/cli/unit.py):\n   - mark-done command with options (--completion-date, --notes, --dry-run)\n   - status command (single unit and --all)\n   - start command\n   - Project directory detection and error handling\n\n3. **MarkdownRenderer Integration** (src/flowgenius/models/renderer.py):\n   - State-aware rendering methods\n   - sync_with_state functionality\n   - Progress tracking in markdown files\n\n**Implementation Plan:**\nCreating `test_progress_tracking_comprehensive.py` with:\n- StateStore unit tests (all methods and edge cases)\n- CLI command integration tests (using Click testing framework)\n- MarkdownRenderer state integration tests\n- End-to-end workflow tests (complete user scenarios)\n- Error handling and edge case tests\n- Performance and concurrency tests\n\n**Testing Framework:**\n- pytest for test structure\n- Click.testing.CliRunner for CLI testing\n- tempfile/tmpdir for isolated test environments\n- Mock where appropriate for external dependencies\n- Comprehensive fixtures for test data\n</info added on 2025-07-02T22:59:04.544Z>",
-            "status": "in-progress",
+            "details": "Create comprehensive tests that cover all aspects of the progress tracking functionality, including edge cases and error handling. Ensure that the tests validate the integration between the State Store, CLI command, and MarkdownRenderer.\n<info added on 2025-07-02T22:59:04.544Z>\nStarting implementation of comprehensive progress tracking tests.\n\n**Analysis Complete - Understanding the Testing Scope:**\n\nThe progress tracking system consists of 3 main components that need comprehensive testing:\n\n1. **StateStore** (src/flowgenius/models/state_store.py):\n   - UnitState, ProjectState models\n   - StateStore class with load/save operations\n   - State initialization from projects\n   - Progress summaries and unit status updates\n\n2. **CLI Unit Commands** (src/flowgenius/cli/unit.py):\n   - mark-done command with options (--completion-date, --notes, --dry-run)\n   - status command (single unit and --all)\n   - start command\n   - Project directory detection and error handling\n\n3. **MarkdownRenderer Integration** (src/flowgenius/models/renderer.py):\n   - State-aware rendering methods\n   - sync_with_state functionality\n   - Progress tracking in markdown files\n\n**Implementation Plan:**\nCreating `test_progress_tracking_comprehensive.py` with:\n- StateStore unit tests (all methods and edge cases)\n- CLI command integration tests (using Click testing framework)\n- MarkdownRenderer state integration tests\n- End-to-end workflow tests (complete user scenarios)\n- Error handling and edge case tests\n- Performance and concurrency tests\n\n**Testing Framework:**\n- pytest for test structure\n- Click.testing.CliRunner for CLI testing\n- tempfile/tmpdir for isolated test environments\n- Mock where appropriate for external dependencies\n- Comprehensive fixtures for test data\n</info added on 2025-07-02T22:59:04.544Z>\n<info added on 2025-07-03T01:35:59.377Z>\n✅ **SUBTASK 6.4 COMPLETED SUCCESSFULLY**\n\n**Comprehensive Testing Implementation Summary:**\n\n**✅ Complete Test Suite Created:**\n- `test_progress_tracking_comprehensive.py` - 1,332 lines of comprehensive tests\n- 46 test cases covering all aspects of progress tracking workflow\n- All tests passing with 100% success rate\n\n**✅ Test Coverage Areas:**\n\n1. **StateStore Core Functionality (11 tests):**\n   - UnitState and ProjectState model validation\n   - State file creation, loading, and saving\n   - Unit status updates and progress tracking\n   - Project initialization and existing progress preservation\n\n2. **StateStore Error Handling (4 tests):**\n   - Invalid JSON handling\n   - Missing field validation  \n   - Permission error scenarios\n   - Datetime serialization edge cases\n\n3. **CLI Unit Commands Integration (10 tests):**\n   - `mark-done` command with all options (completion date, notes, dry-run)\n   - `status` command for individual and all units\n   - `start` command functionality\n   - Error handling for non-existent units and invalid project directories\n\n4. **MarkdownRenderer State Integration (5 tests):**\n   - State-aware content rendering\n   - Table of contents with progress tracking\n   - File synchronization with state.json\n   - Fallback to project model when state unavailable\n\n5. **End-to-End Workflows (7 tests):**\n   - Complete user workflow simulation\n   - Concurrent unit updates and race condition handling\n   - Large project scalability\n   - State recovery from corruption\n   - CLI error handling edge cases\n\n6. **Performance and Scalability (3 tests):**\n   - State file size with many progress notes\n   - Concurrent CLI operations\n   - Memory usage with large projects\n\n7. **Error Handling Edge Cases (6 tests):**\n   - Invalid datetime formats\n   - Unicode and special characters\n   - Extremely long content\n   - File permission scenarios\n   - Malformed project files\n\n**✅ Integration Verification:**\n- All 150 total tests passing (46 progress tracking + 104 existing)\n- No regressions in existing functionality\n- Complete workflow integration verified\n- StateStore ↔ CLI ↔ MarkdownRenderer integration working seamlessly\n\n**✅ Key Testing Features:**\n- **Comprehensive fixtures** for isolated test environments\n- **Click testing framework** for CLI command testing\n- **End-to-end workflows** simulating real user interactions\n- **Error injection** and edge case testing\n- **Performance testing** for scalability validation\n- **Concurrency testing** for race condition detection\n\n**✅ Test Quality Metrics:**\n- ✅ 100% test success rate (46/46 + 104/104)\n- ✅ All critical user workflows covered\n- ✅ All error scenarios and edge cases tested\n- ✅ Integration between all components verified\n- ✅ Performance and scalability validated\n\n**Subtask 6.4 Complete:**\nThe comprehensive testing suite provides robust validation for the entire progress tracking system and ensures reliability for production use!\n</info added on 2025-07-03T01:35:59.377Z>",
+            "status": "done",
             "testStrategy": "Implement end-to-end tests that simulate user interactions with the CLI and verify the correct updates in both state.json and Markdown files."
           }
         ]
@@ -349,8 +349,65 @@
         "dependencies": [
           6
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Integrate Conversation Manager",
+            "description": "Set up the Conversation Manager to handle user feedback for refining Units.",
+            "dependencies": [],
+            "details": "Implement the Conversation Manager to capture and process user feedback. Ensure it can trigger the refinement process by interacting with the LangChain framework.\n<info added on 2025-07-03T02:14:09.948Z>\nStarting implementation of Conversation Manager for Task 7.1\n\nAnalysis:\n- LangChain core is already available as dependency (>=0.3.0)\n- Need to create a conversation manager to handle user feedback\n- Should integrate with existing agent architecture  \n- Will use LangChain's ConversationBufferMemory as mentioned in PRD\n- Need to set up the interface for capturing and processing user feedback for unit refinement\n\nImplementation Plan:\n1. Create `conversation_manager.py` in the agents directory\n2. Implement ConversationManager class using LangChain ConversationBufferMemory\n3. Set up methods for capturing user feedback about units\n4. Create interface for triggering refinement process\n5. Integrate with existing OpenAI client pattern used by other agents\n\nNext Steps:\n- Implement the conversation manager module\n- Test basic conversation flow\n- Set up integration points for refinement logic\n</info added on 2025-07-03T02:14:09.948Z>",
+            "status": "done",
+            "testStrategy": "Test by simulating user feedback and verifying that the Conversation Manager correctly processes and forwards it for refinement."
+          },
+          {
+            "id": 2,
+            "title": "Implement Feedback Processing Logic",
+            "description": "Develop logic to process feedback and determine necessary refinements to Units.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a module that interprets feedback from the Conversation Manager and identifies specific changes needed in the Units. This module should interface with LangChain to determine the appropriate actions.\n<info added on 2025-07-03T02:19:58.494Z>\nStarting implementation of Feedback Processing Logic for Task 7.2\n\n**Completed in 7.1:**\n- Created `conversation_manager.py` with basic ConversationManager class\n- Implemented UserFeedback data model for structured feedback\n- Set up basic conversation session management\n- Integrated with existing OpenAI client pattern\n\n**Analysis for 7.2:**\n- Need to create logic that interprets feedback from ConversationManager\n- Should identify specific changes needed in Units based on user input\n- Must interface with LangChain to determine appropriate refinement actions\n- Should categorize feedback types (content, resources, tasks, difficulty)\n- Need to extract actionable insights from conversational feedback\n\n**Implementation Plan for 7.2:**\n1. Create `feedback_processor.py` module in agents directory\n2. Implement FeedbackProcessor class that analyzes UserFeedback objects\n3. Add methods to categorize feedback types automatically\n4. Create logic to extract specific refinement actions needed\n5. Interface with LangChain for intelligent feedback interpretation\n6. Generate structured refinement instructions for agents\n\n**Next Steps:**\n- Implement the feedback processing module\n- Test feedback categorization logic\n- Create interface for generating refinement actions\n</info added on 2025-07-03T02:19:58.494Z>",
+            "status": "done",
+            "testStrategy": "Use unit tests to validate that various types of feedback are correctly interpreted and mapped to refinement actions."
+          },
+          {
+            "id": 3,
+            "title": "Integrate LangChain for Refinement",
+            "description": "Utilize LangChain to re-call agents and apply the necessary updates to Units based on processed feedback.",
+            "dependencies": [
+              2
+            ],
+            "details": "Leverage LangChain's capabilities to execute the refinement actions determined by the feedback processing logic. Ensure that the agents can modify the Units as required.\n<info added on 2025-07-03T02:28:51.459Z>\nStarting implementation of LangChain integration for Task 7.3\n\n**Completed in 7.1 & 7.2:**\n- ✅ ConversationManager with LangChain ConversationBufferMemory\n- ✅ UserFeedback data model for structured feedback  \n- ✅ FeedbackProcessor with comprehensive analysis capabilities\n- ✅ RefinementAction model for specific unit modifications\n- ✅ ProcessedFeedback with categorization and sentiment analysis\n- ✅ LangChain PromptTemplate integration for AI analysis\n\n**Analysis for 7.3:**\n- Need to create a refinement engine that executes RefinementActions\n- Should leverage LangChain to re-call existing agents (ContentGenerator, ResourceCurator, EngageTaskGenerator)\n- Must apply the necessary updates to Units based on processed feedback\n- Need to coordinate different agents based on action target_component\n- Should ensure agents can modify Units according to refinement specifications\n\n**Implementation Plan for 7.3:**\n1. Create `unit_refinement_engine.py` module in agents directory\n2. Implement UnitRefinementEngine class that coordinates agent re-calls\n3. Add methods to map RefinementActions to specific agent operations\n4. Create LangChain chains for different types of refinements\n5. Integrate with existing agents (ResourceCurator, EngageTaskGenerator, etc.)\n6. Implement unit modification logic based on refinement actions\n\n**Next Steps:**\n- Implement the refinement engine module\n- Test agent re-calling functionality  \n- Verify unit modifications are applied correctly\n</info added on 2025-07-03T02:28:51.459Z>",
+            "status": "done",
+            "testStrategy": "Conduct integration tests to ensure LangChain agents correctly apply refinements to Units as specified by the feedback processing logic."
+          },
+          {
+            "id": 4,
+            "title": "Save Refined Units",
+            "description": "Ensure that the refined content is saved back to the appropriate files.",
+            "dependencies": [
+              3
+            ],
+            "details": "Implement functionality to persist changes made to Units by saving the refined content back to their respective files. Ensure data integrity and consistency.\n<info added on 2025-07-03T02:31:30.514Z>\nStarting implementation of Save Refined Units functionality for Task 7.4\n\n**Completed in 7.1, 7.2 & 7.3:**\n- ✅ ConversationManager for user feedback collection\n- ✅ FeedbackProcessor for analyzing feedback and generating refinement actions\n- ✅ UnitRefinementEngine for executing refinement actions via agent coordination\n- ✅ RefinementResult model for tracking applied changes\n- ✅ Complete LangChain integration for agent orchestration\n\n**Analysis for 7.4:**\n- Need to implement persistence functionality for refined units\n- Should save changes back to project.json and update markdown files\n- Must ensure data integrity and consistency during file operations\n- Need to integrate with existing MarkdownRenderer for regenerating unit files\n- Should handle backup/versioning of original files before modification\n- Must update state.json to reflect refinement activity\n\n**Implementation Plan for 7.4:**\n1. Create `refinement_persistence.py` module in models directory\n2. Implement RefinementPersistence class for file operations\n3. Add methods to save refined LearningProject back to project.json\n4. Integrate with MarkdownRenderer to regenerate unit markdown files\n5. Implement backup/rollback functionality for safety\n6. Add refinement tracking to StateStore for history\n\n**Key Integration Points:**\n- Use existing MarkdownRenderer.update_unit_progress() for markdown updates\n- Leverage StateStore for tracking refinement operations\n- Coordinate with project loading/saving utilities\n\n**Next Steps:**\n- Implement the persistence module\n- Test file saving and regeneration\n- Verify data integrity and backup functionality\n</info added on 2025-07-03T02:31:30.514Z>",
+            "status": "done",
+            "testStrategy": "Verify through file comparison tests that the refined content is accurately saved and matches expected outcomes."
+          },
+          {
+            "id": 5,
+            "title": "Develop Command Interface",
+            "description": "Create the 'unit --refine' command interface to allow users to initiate the refinement process.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Design and implement a command-line interface for the 'unit --refine' command. Ensure it integrates seamlessly with the Conversation Manager and triggers the entire refinement loop.\n<info added on 2025-07-03T02:33:00.714Z>\nStarting implementation of CLI Command Interface for Task 7.5\n\n**Completed in 7.1, 7.2, 7.3 & 7.4:**\n- ✅ ConversationManager for interactive user feedback collection\n- ✅ FeedbackProcessor for intelligent feedback analysis and action generation\n- ✅ UnitRefinementEngine for executing refinements via agent coordination\n- ✅ RefinementPersistence for saving changes with backup/history functionality\n- ✅ Complete integration with existing agents and LangChain framework\n\n**Analysis for 7.5:**\n- Need to implement the `flowgenius unit refine` CLI command\n- Should provide an interactive experience for collecting user feedback\n- Must integrate all refinement components into a cohesive workflow\n- Need to handle user interaction, feedback processing, and file saving\n- Should provide clear feedback on refinement progress and results\n- Must ensure error handling and graceful failure scenarios\n\n**Implementation Plan for 7.5:**\n1. Add `refine` command to existing `src/flowgenius/cli/unit.py`\n2. Implement interactive feedback collection workflow\n3. Integrate ConversationManager, FeedbackProcessor, and UnitRefinementEngine\n4. Add progress tracking and user feedback during refinement\n5. Handle configuration loading for OpenAI client initialization\n6. Implement proper error handling and recovery\n\n**Integration Flow:**\n```\nunit refine <unit_id> -> \nLoad unit -> Start conversation -> \nCollect feedback -> Process feedback ->\nApply refinements -> Save changes ->\nShow results\n```\n\n**Next Steps:**\n- Implement the refine command in unit.py\n- Test end-to-end refinement workflow\n- Verify all components work together seamlessly\n</info added on 2025-07-03T02:33:00.714Z>",
+            "status": "done",
+            "testStrategy": "Perform end-to-end testing by executing the command and verifying that it initiates the refinement process and completes successfully."
+          }
+        ]
       },
       {
         "id": 8,
@@ -394,7 +451,7 @@
     ],
     "metadata": {
       "created": "2025-07-01T17:03:10.935Z",
-      "updated": "2025-07-02T22:58:38.156Z",
+      "updated": "2025-07-03T02:34:01.985Z",
       "description": "Tasks for master context"
     }
   }
