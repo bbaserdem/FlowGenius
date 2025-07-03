@@ -8,6 +8,7 @@ including user preferences, API settings, and project defaults.
 from pathlib import Path
 from typing import Optional, Literal
 from pydantic import BaseModel, Field, field_validator
+from platformdirs import user_config_dir, user_documents_dir
 from .settings import DefaultSettings
 
 
@@ -79,6 +80,17 @@ class FlowGeniusConfig(BaseModel):
         return v.strip()
 
 
+def get_config_dir() -> Path:
+    """
+    Get the FlowGenius configuration directory following XDG standards.
+    
+    Returns:
+        Path to the configuration directory
+    """
+    config_dir = Path(user_config_dir("flowgenius", ensure_exists=True))
+    return config_dir
+
+
 def get_config_path() -> Path:
     """
     Get the path to the FlowGenius configuration file.
@@ -86,21 +98,21 @@ def get_config_path() -> Path:
     Returns:
         Path to the configuration file
     """
-    home = Path.home()
-    config_dir = home / ".flowgenius"
-    config_dir.mkdir(exist_ok=True)
-    return config_dir / "config.yaml"
+    return get_config_dir() / "config.yaml"
 
 
 def get_default_projects_root() -> Path:
     """
-    Get the default projects root directory.
+    Get the default projects root directory following XDG user directory standards.
+    
+    Uses XDG_DOCUMENTS_DIR/FlowGenius if available, otherwise falls back
+    to ~/Documents/FlowGenius.
     
     Returns:
         Path to the default projects directory
     """
-    home = Path.home()
-    projects_dir = home / "FlowGenius" / "Projects"
+    documents_dir = Path(user_documents_dir())
+    projects_dir = documents_dir / "FlowGenius"
     projects_dir.mkdir(parents=True, exist_ok=True)
     return projects_dir
 
@@ -114,8 +126,8 @@ def create_default_config() -> FlowGeniusConfig:
     """
     home = Path.home()
     
-    # Create default OpenAI key file path
-    key_file = home / ".flowgenius" / "openai_key.txt"
+    # Create default OpenAI key file path in XDG config directory
+    key_file = get_config_dir() / "openai_key.txt"
     
     # Create default projects directory
     projects_root = get_default_projects_root()

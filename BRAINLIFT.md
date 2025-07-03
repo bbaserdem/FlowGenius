@@ -71,7 +71,7 @@ FlowGenius should support both **skill acquisition** and **theoretical understan
 
 - Text-first (terminal UI)  
 - Files saved as structured Markdown (`toc.md`, `unitXX.md`)  
-- Folder-based project structure (`~/Learning/<topic>/...`)  
+- Folder-based project structure (`~/Documents/FlowGenius/<topic>/...`)  
 - Config stored in `$XDG_CONFIG_HOME/flowgenius/config.yaml`  
 - Obsidian-style (wiki-style + yaml frontmatter) or markdown-style links (user preference)
 

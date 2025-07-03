@@ -8,7 +8,7 @@
 #   programs.flowgenius = {
 #     enable = true;
 #     openaiKeyPath = "${config.home.homeDirectory}/.secrets/openai_api_key";
-#     projectsRoot = "${config.home.homeDirectory}/Learning";
+#     projectsRoot = "${config.home.homeDirectory}/Documents/FlowGenius";
 #     linkStyle = "obsidian";
 #     defaultModel = "gpt-4o-mini";
 #   };
@@ -82,11 +82,12 @@ in {
 
     projectsRoot = mkOption {
       type = types.str;
-      default = "${config.home.homeDirectory}/Learning";
-      example = "${config.home.homeDirectory}/Documents/FlowGenius";
+      default = "${config.home.homeDirectory}/Documents/FlowGenius";
+      example = "${config.home.homeDirectory}/Projects/Learning";
       description = ''
         Root directory where FlowGenius will create learning projects.
         
+        Defaults to XDG_DOCUMENTS_DIR/FlowGenius (typically ~/Documents/FlowGenius).
         Each project gets its own subdirectory with a unique ID.
         The directory will be created automatically if it doesn't exist.
       '';
@@ -183,7 +184,7 @@ in {
       programs.flowgenius = {
         enable = true;
         openaiKeyPath = "''${config.home.homeDirectory}/.secrets/openai_api_key";
-        projectsRoot = "''${config.home.homeDirectory}/Learning";
+        projectsRoot = "''${config.home.homeDirectory}/Documents/FlowGenius";
       };
       ```
 

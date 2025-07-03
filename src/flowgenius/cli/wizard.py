@@ -11,7 +11,7 @@ import questionary
 from pathlib import Path
 from typing import Optional
 
-from ..models.config import FlowGeniusConfig, get_config_path, get_default_projects_root
+from ..models.config import FlowGeniusConfig, get_config_path, get_config_dir, get_default_projects_root
 from ..models.config_manager import ConfigManager
 from ..models.settings import DefaultSettings
 
@@ -155,11 +155,12 @@ def run_setup_wizard() -> Optional[FlowGeniusConfig]:
         default=True
     ).ask()
     
-    # Save API key to file
-    key_file = config_path.parent / "openai_key.txt"
-    key_file.parent.mkdir(parents=True, exist_ok=True)
+    # Save API key to file in XDG config directory
+    config_dir = get_config_dir()
+    config_dir.mkdir(parents=True, exist_ok=True)
+    key_file = config_dir / "openai_key.txt"
     key_file.write_text(api_key.strip())
-    key_file.chmod(0o600)  # Secure permissions
+    key_file.chmod(0o600)
     
     # Create configuration
     config = FlowGeniusConfig(
@@ -206,15 +207,14 @@ def run_setup_wizard() -> Optional[FlowGeniusConfig]:
 
 def validate_openai_key(api_key: str) -> bool:
     """
-    Validate OpenAI API key format.
+    Validate the OpenAI API key format.
     
     Args:
-        api_key: API key to validate
+        api_key: The API key to validate
         
     Returns:
-        True if key format appears valid
+        True if the API key appears to be valid, False otherwise
     """
-    # Basic validation - OpenAI keys start with 'sk-' and are typically 51 chars
     return (
         api_key.startswith('sk-') and 
         len(api_key) >= 20 and

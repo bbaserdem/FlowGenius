@@ -5,7 +5,7 @@ This package contains Pydantic data models and schemas for representing
 learning projects, units, resources, and configuration.
 """
 
-from .config import FlowGeniusConfig, get_config_path, get_default_projects_root
+from .config import FlowGeniusConfig, get_config_path, get_config_dir, get_default_projects_root
 from .config_manager import ConfigManager
 from .project import (
     LearningResource, EngageTask, LearningUnit, ProjectMetadata, LearningProject,
@@ -22,6 +22,7 @@ __all__ = [
     "FlowGeniusConfig",
     "ConfigManager", 
     "get_config_path",
+    "get_config_dir",
     "get_default_projects_root",
     
     # Settings

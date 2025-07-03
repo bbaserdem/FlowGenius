@@ -419,8 +419,62 @@
         "dependencies": [
           7
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Verify Local Storage Implementation",
+            "description": "Check that all data is stored locally on the device.",
+            "dependencies": [],
+            "details": "Ensure that no data is being sent to cloud storage and that all files are accessible locally.\n<info added on 2025-07-03T23:09:26.523Z>\nExploration findings for local storage verification:\n\nSTORAGE IMPLEMENTATION ANALYSIS:\n1. **All data is stored locally** - No cloud storage services detected:\n   - Configuration: ~/.flowgenius/config.yaml (via config_manager.py)\n   - Projects: Stored in user-defined projects_root directory (default: ~/Learning or ~/FlowGenius/Projects)\n   - State files: state.json and project.json in each project directory\n   - Markdown files: toc.md, unitXX.md, README.md in project directories\n   - Refinement backups: .refinement_backups/ directory within projects\n   - History: .refinement_history.json in project directories\n\n2. **File Operations**:\n   - Utils module provides safe_save_json() and safe_load_json() functions\n   - All file operations use pathlib Path objects pointing to local filesystem\n   - Directory creation is handled locally with parents=True, exist_ok=True\n\n3. **External Dependencies**:\n   - Only external API call is to OpenAI for content generation\n   - No other cloud services, databases, or network storage detected\n   - All dependencies in requirements.txt are standard Python libraries\n\n4. **API Key Storage**:\n   - OpenAI API key is stored in a local file (path specified in config)\n   - Config example shows: openai_key_path: ~/.secrets/openai_api_key\n   - Home-manager module enforces chmod 600 for security\n\nCONCLUSION: All storage is already local. No changes needed for subtask 8.1.\n</info added on 2025-07-03T23:09:26.523Z>\n<info added on 2025-07-03T23:42:02.386Z>\nCONFIGURATION DIRECTORY UPDATE:\n1. **Issue Found**: Code was using `~/.flowgenius` but documentation referenced XDG standard `~/.config/flowgenius`\n2. **Fix Applied**:\n   - Updated src/flowgenius/models/config.py to use platformdirs.user_config_dir()\n   - Added get_config_dir() function for XDG-compliant directory\n   - Updated wizard to save API key in XDG config directory\n   - Fixed test to use `.config/flowgenius` path\n   - Updated all documentation to reflect correct XDG path\n\n3. **Benefits**:\n   - Follows XDG Base Directory specification\n   - Consistent with modern Linux applications\n   - Matches Nix home-manager module expectations\n   - Cleaner home directory organization\n\n4. **Test Results**: All 9 offline functionality tests pass with new XDG config location\n</info added on 2025-07-03T23:42:02.386Z>\n<info added on 2025-07-03T23:55:13.318Z>\nXDG USER DIRECTORIES UPDATE:\n1. **Issue Found**: Default project directory was using `~/Learning` or `~/FlowGenius/Projects` instead of following XDG standards\n2. **Solution Implemented**:\n   - Updated `get_default_projects_root()` to use `platformdirs.user_documents_dir()`\n   - New default: `$XDG_DOCUMENTS_DIR/FlowGenius` (typically `~/Documents/FlowGenius`)\n   - Falls back to `~/Documents/FlowGenius` if XDG_DOCUMENTS_DIR is not set\n\n3. **Changes Made**:\n   - src/flowgenius/models/config.py: Added `user_documents_dir` import and updated default path\n   - docs/offline_storage_guide.md: Updated all references to new path\n   - docs/security_review_local_storage.md: Updated example config and storage locations\n   - nix/hm.nix: Updated default value and documentation\n   - nix/example-config.nix: Updated commented default\n   - nix/README.md: Updated examples and troubleshooting\n   - BRAINLIFT.md: Updated project structure example\n\n4. **Benefits**:\n   - Follows XDG Base Directory specification\n   - Consistent with desktop applications standards\n   - Uses standard user documents directory\n   - Better organization (documents vs random home folders)\n   - Cross-platform compatible via platformdirs\n\n5. **Test Results**: All tests pass, default path correctly shows `~/Documents/FlowGenius`\n</info added on 2025-07-03T23:55:13.318Z>",
+            "status": "done",
+            "testStrategy": "Manual verification of file storage locations."
+          },
+          {
+            "id": 2,
+            "title": "Test Application Offline Functionality",
+            "description": "Ensure the application operates without internet connectivity.",
+            "dependencies": [
+              1
+            ],
+            "details": "Simulate offline conditions and verify that all features work as expected, except for OpenAI API calls.\n<info added on 2025-07-03T23:20:59.991Z>\nCompleted offline functionality testing:\n\nTEST SUITE CREATED:\n- Created comprehensive test suite in tests/test_offline_functionality.py\n- 9 tests covering all aspects of offline functionality\n\nTEST RESULTS (All Pass):\n1. ✅ test_config_manager_offline - Configuration management works without network\n2. ✅ test_local_file_operations - File I/O operations work offline  \n3. ✅ test_state_store_offline - Progress tracking state persistence works offline\n4. ✅ test_markdown_renderer_offline - Markdown generation works offline\n5. ✅ test_refinement_persistence_offline - Project refinement/backup works offline\n6. ✅ test_project_listing_offline - Project listing/discovery works offline\n7. ✅ test_openai_calls_fail_gracefully_offline - OpenAI calls fail with clear errors when offline\n8. ✅ test_api_key_loading_offline - API key loading from file path works offline\n9. ✅ test_home_manager_config_generation - Config file generation works offline\n\nKEY FINDINGS:\n- All data storage operations are local (config, projects, state, markdown)\n- No cloud dependencies except OpenAI API calls\n- File permissions (600) enforced for API key security\n- OpenAI failures are graceful with clear error messages\n- All core functionality works without internet connectivity\n\nVERIFICATION COMPLETE: Application is offline-safe as specified.\n</info added on 2025-07-03T23:20:59.991Z>",
+            "status": "done",
+            "testStrategy": "Conduct offline testing scenarios."
+          },
+          {
+            "id": 3,
+            "title": "Implement Secrets Injection via File Path",
+            "description": "Set up the mechanism for injecting secrets through specified file paths.",
+            "dependencies": [],
+            "details": "Ensure that sensitive information is not hardcoded and is retrieved securely from local files.\n<info added on 2025-07-03T23:14:40.557Z>\nInvestigation findings for secret injection via file path:\n\nSECRET HANDLING IMPLEMENTATION:\n1. **API Key Storage**:\n   - Configuration stores path to API key file: `openai_key_path` in config.yaml\n   - Default locations: ~/.openai_api_key or ~/.flowgenius/openai_key.txt\n   - Home-manager supports custom paths like ~/.secrets/openai_api_key\n\n2. **Key Loading Process**:\n   - project_generator.py: `_load_api_key()` reads from Path(config.openai_key_path).expanduser()\n   - cli/unit.py: `_get_openai_key()` reads from config.openai_key_path, falls back to env var\n   - Each agent factory function accepts optional api_key parameter\n\n3. **Security Features**:\n   - File permissions enforced: chmod 600 on API key files\n   - Home-manager includes activation script to ensure proper permissions\n   - Setup wizard creates key file with 0o600 permissions automatically\n\n4. **Validation**:\n   - Key format validation in wizard: must start with 'sk-', minimum length 20\n   - FileNotFoundError raised if key file doesn't exist\n   - Clear error messages guide users to run 'flowgenius wizard'\n\nIMPLEMENTATION QUALITY:\n- ✅ No hardcoded secrets found\n- ✅ API key stored in separate file with restricted permissions\n- ✅ Path-based injection already implemented\n- ✅ Fallback to environment variable (OPENAI_API_KEY) supported\n- ✅ All agents support receiving API key via parameter\n\nCONCLUSION: Secret injection via file path is already properly implemented. No changes needed.\n</info added on 2025-07-03T23:14:40.557Z>",
+            "status": "done",
+            "testStrategy": "Review code and test secret retrieval functionality."
+          },
+          {
+            "id": 4,
+            "title": "Conduct Security Review of Local Storage",
+            "description": "Review the security measures in place for local data storage.",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "Assess encryption and access controls for locally stored data.\n<info added on 2025-07-03T23:23:10.496Z>\nCompleted security review of local storage:\n\nSECURITY REVIEW CONDUCTED:\n- Created comprehensive security review document: docs/security_review_local_storage.md\n- Evaluated 7 key security areas\n\nFINDINGS BY AREA:\n1. ✅ API Key Protection - SECURE\n   - Keys stored in separate files with 600 permissions\n   - Never hardcoded, path-based injection\n\n2. ✅ Configuration Security - SECURE  \n   - No sensitive data in config files\n   - Only API key path referenced\n\n3. ✅ Project Data Storage - SECURE\n   - All data local in user-defined directories\n   - Standard filesystem permissions\n\n4. ⚠️ File Permissions - MINOR CONCERN\n   - API keys: 600 enforced ✅\n   - Other files: Default umask (could be improved)\n\n5. ✅ Input Validation - SECURE\n   - Pydantic models validate all data\n   - Path traversal prevention\n   - API key format validation\n\n6. ✅ Error Handling - SECURE\n   - No sensitive data in error messages\n   - Graceful failures with helpful guidance\n\n7. ✅ Temporary Files - SECURE\n   - No temp files with sensitive data\n   - Atomic operations via safe_save_json()\n\nSECURITY STRENGTHS:\n- No cloud dependencies\n- Proper secret management  \n- Strong input validation\n- GDPR compliant (local control)\n\nLOW PRIORITY RECOMMENDATIONS:\n- Set explicit permissions for all files\n- Consider optional backup encryption\n- Add security audit logging\n\nOVERALL RATING: SECURE ✅\n</info added on 2025-07-03T23:23:10.496Z>",
+            "status": "done",
+            "testStrategy": "Perform a security audit and vulnerability assessment."
+          },
+          {
+            "id": 5,
+            "title": "Document Offline-safe Storage Procedures",
+            "description": "Create documentation outlining the offline-safe storage processes.",
+            "dependencies": [
+              2,
+              4
+            ],
+            "details": "Provide clear guidelines on how to maintain offline functionality and secure local storage.\n<info added on 2025-07-03T23:25:46.195Z>\nCompleted offline-safe storage documentation:\n\nDOCUMENTATION CREATED:\n1. **docs/offline_storage_guide.md** - Comprehensive user and developer guide\n2. **Updated README.md** - Added documentation section with links\n\nOFFLINE STORAGE GUIDE CONTENTS:\n- Overview of offline-first design\n- Complete storage architecture diagram\n- What works offline vs requires internet\n- Security best practices for users\n- Troubleshooting common issues\n- Developer guidelines for maintaining offline compatibility\n- Testing strategies\n\nKEY SECTIONS:\n1. **Storage Architecture**\n   - Directory structure visualization\n   - File types and purposes table\n   \n2. **Offline Functionality**\n   - Full list of offline features\n   - Clear separation of online requirements\n   \n3. **Security Best Practices**\n   - API key protection (chmod 600)\n   - File permissions guide\n   - Backup security\n   - Multi-user system considerations\n   \n4. **Developer Guidelines**\n   - Code examples for offline-first design\n   - Security checklist\n   - Testing patterns\n\nDOCUMENTATION QUALITY:\n- Clear, actionable instructions\n- Code examples and commands\n- Troubleshooting section\n- Best practices for users and developers\n- NixOS-specific setup instructions\n\nAll documentation complete and integrated into project.\n</info added on 2025-07-03T23:25:46.195Z>",
+            "status": "done",
+            "testStrategy": "Review documentation for clarity and completeness."
+          }
+        ]
       },
       {
         "id": 9,
@@ -611,7 +665,7 @@
     ],
     "metadata": {
       "created": "2025-07-01T17:03:10.935Z",
-      "updated": "2025-07-03T23:05:54.281Z",
+      "updated": "2025-07-03T23:30:13.032Z",
       "description": "Tasks for master context"
     }
   }

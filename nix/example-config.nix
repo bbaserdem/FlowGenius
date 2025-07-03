@@ -14,7 +14,7 @@
     enable = true;
     # Uses defaults:
     # - openaiKeyPath = "~/.openai_api_key"
-    # - projectsRoot = "~/Learning" 
+    # - projectsRoot = "~/Documents/FlowGenius" 
     # - linkStyle = "obsidian"
     # - defaultModel = "gpt-4o-mini"
   };

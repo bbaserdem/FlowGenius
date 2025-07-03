@@ -25,7 +25,7 @@ Add to your `home.nix` or `flake.nix`:
   programs.flowgenius = {
     enable = true;
     openaiKeyPath = "${config.home.homeDirectory}/.secrets/openai_api_key";
-    projectsRoot = "${config.home.homeDirectory}/Learning";
+    projectsRoot = "${config.home.homeDirectory}/Documents/FlowGenius";
     linkStyle = "obsidian";
     defaultModel = "gpt-4o-mini";
   };
@@ -53,7 +53,7 @@ home-manager switch
 | `enable` | bool | `false` | Enable FlowGenius |
 | `package` | package | (built from source) | FlowGenius package to use |
 | `openaiKeyPath` | string | `~/.openai_api_key` | Path to OpenAI API key file |
-| `projectsRoot` | string | `~/Learning` | Root directory for projects |
+| `projectsRoot` | string | `~/Documents/FlowGenius` | Root directory for projects |
 | `linkStyle` | enum | `"obsidian"` | Link style: "obsidian" or "markdown" |
 | `defaultModel` | string | `"gpt-4o-mini"` | Default OpenAI model |
 | `createProjectsDirectory` | bool | `true` | Auto-create projects directory |
@@ -155,7 +155,7 @@ If you already have a FlowGenius configuration from running `flowgenius wizard`,
 chmod 600 ~/.secrets/openai_api_key
 
 # Fix projects directory
-chmod 755 ~/Learning
+chmod 755 ~/Documents/FlowGenius
 ```
 
 ### Module Not Found

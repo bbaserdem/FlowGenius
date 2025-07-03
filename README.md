@@ -78,6 +78,38 @@ FlowGenius stores configuration in `$XDG_CONFIG_HOME/flowgenius/config.yaml` (ty
 
 3. **Manual Configuration**: Edit `~/.config/flowgenius/config.yaml` directly
 
+## Documentation
+
+### 📖 Core Documentation
+
+- **[Offline Storage Guide](docs/offline_storage_guide.md)** - How FlowGenius maintains offline functionality and secure local storage
+- **[Security Review](docs/security_review_local_storage.md)** - Comprehensive security assessment of the local storage implementation
+
+### 🔒 Privacy & Security
+
+FlowGenius is designed with privacy in mind:
+- **All data stored locally** - No cloud storage or tracking
+- **Offline-first** - Works without internet (except for content generation)
+- **Secure API key handling** - Keys stored in files with 600 permissions
+- **No telemetry** - Your learning journey stays private
+
+See the [Security Review](docs/security_review_local_storage.md) for detailed security analysis.
+
+## Features
+
+- **Conversational Setup**: Natural language interface for defining learning goals
+- **AI-Powered Scaffolding**: Intelligently structures your learning path
+- **Resource Curation**: Finds relevant videos, articles, and documentation
+- **Engagement Tasks**: Practical exercises to reinforce learning
+- **Progress Tracking**: Built-in state management for your learning journey
+- **Markdown Export**: All content in portable, future-proof formats
+
+## System Requirements
+
+- Python 3.8+
+- OpenAI API key
+- Unix-like OS (Linux, macOS) or Windows with proper permissions support
+
 ## Development
 
 ### Prerequisites
@@ -172,3 +204,13 @@ MIT License - see [LICENSE](LICENSE) for details.
 - [ ] **Task 10**: Documentation and demo script
 
 *Current Status: 2/10 tasks complete* ✅ ✅ ⏳ ⏳ ⏳ ⏳ ⏳ ⏳ ⏳ ⏳
+
+## Support
+
+- **Issues**: GitHub Issues for bug reports and feature requests
+- **Discussions**: GitHub Discussions for questions and community support
+- **Documentation**: See the `docs/` directory for detailed guides
+
+---
+
+Built with ❤️ for lifelong learners who value privacy and local-first software.
