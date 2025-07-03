@@ -258,7 +258,7 @@ class RefinementPersistence:
         # Get units that were modified
         modified_units = set()
         for result in refinement_results:
-            if result.success and result.modified_components:
+            if result.success and result.updated_components:
                 modified_units.add(result.unit_id)
         
         # Regenerate markdown files for modified units
@@ -284,15 +284,15 @@ class RefinementPersistence:
             "results": [
                 {
                     "unit_id": result.unit_id,
-                    "actions_applied": result.actions_applied,
-                    "modified_components": result.modified_components,
+                    "actions_applied": result.changes_made,
+                    "modified_components": result.updated_components,
                     "success": result.success,
                     "summary": result.summary
                 }
                 for result in refinement_results
             ],
             "total_units_refined": len([r for r in refinement_results if r.success]),
-            "total_actions_applied": sum(len(r.actions_applied) for r in refinement_results)
+            "total_actions_applied": sum(len(r.changes_made) for r in refinement_results)
         }
         
         # Add to history
@@ -348,7 +348,7 @@ class RefinementPersistence:
             return "No refinements applied"
         
         successful_results = [r for r in refinement_results if r.success]
-        total_actions = sum(len(r.actions_applied) for r in successful_results)
+        total_actions = sum(len(r.changes_made) for r in successful_results)
         
         summary_parts = [
             f"Refined {len(successful_results)} units",

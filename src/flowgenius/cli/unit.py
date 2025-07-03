@@ -506,7 +506,6 @@ def refine(unit_id: str, dry_run: bool, no_backup: bool) -> None:
         # Initialize refinement components
         from openai import OpenAI
         from ..agents.conversation_manager import create_conversation_manager
-        from ..agents.feedback_processor import create_feedback_processor
         from ..agents.unit_refinement_engine import create_unit_refinement_engine
         from ..models.refinement_persistence import create_refinement_persistence
         from ..models.renderer import MarkdownRenderer
@@ -521,7 +520,6 @@ def refine(unit_id: str, dry_run: bool, no_backup: bool) -> None:
         
         # Initialize components
         conversation_mgr = create_conversation_manager(openai_key, config.default_model)
-        feedback_processor = create_feedback_processor(openai_key, config.default_model)
         refinement_engine = create_unit_refinement_engine(openai_key, config.default_model)
         
         # Create renderer and persistence
@@ -560,44 +558,34 @@ def refine(unit_id: str, dry_run: bool, no_backup: bool) -> None:
             click.echo("ℹ️  No feedback provided. Refinement cancelled.")
             return
         
-        click.echo(f"📝 Collected {len(feedback_collection)} feedback items. Analyzing...")
-        
-        # Process all feedback
-        processed_feedback_list = []
-        for feedback in feedback_collection:
-            processed = feedback_processor.process_feedback(feedback, unit)
-            processed_feedback_list.append(processed)
-        
-        # Consolidate feedback
-        consolidated_plan = feedback_processor.consolidate_feedback(processed_feedback_list)
-        
-        click.echo()
-        click.echo(f"🎯 Refinement Plan: {consolidated_plan['summary']}")
-        
-        if consolidated_plan['actions']:
-            click.echo("   Actions to apply:")
-            for i, action in enumerate(consolidated_plan['actions'], 1):
-                priority_emoji = "🔥" if action.priority >= 4 else "📋" if action.priority == 3 else "📌"
-                click.echo(f"   {i}. {priority_emoji} {action.description}")
+        click.echo(f"📝 Collected {len(feedback_collection)} feedback items.")
         
         if dry_run:
             click.echo()
-            click.echo("🔍 Dry run complete. No changes were made.")
+            click.echo("🔍 Analyzing feedback (dry run)...")
+            
+            # Show what would be done for each feedback
+            for i, feedback in enumerate(feedback_collection, 1):
+                click.echo(f"\n   Feedback {i}: {feedback.feedback_text[:50]}...")
+                # The engine would analyze this internally
+                click.echo("   Would apply appropriate refinements based on this feedback.")
+            
+            click.echo("\n🔍 Dry run complete. No changes were made.")
             return
         
         # Confirm refinement
         click.echo()
-        if not click.confirm("Apply these refinements?"):
+        if not click.confirm("Apply refinements based on your feedback?"):
             click.echo("Refinement cancelled.")
             return
         
         click.echo()
         click.echo("🔄 Applying refinements...")
         
-        # Apply refinements for each processed feedback
+        # Apply refinements using the unified workflow
         refinement_results = []
-        for processed in processed_feedback_list:
-            result = refinement_engine.refine_unit(unit, processed)
+        for feedback in feedback_collection:
+            result = refinement_engine.apply_refinement(unit, feedback)
             refinement_results.append(result)
         
         # Save refined project
@@ -629,7 +617,7 @@ def refine(unit_id: str, dry_run: bool, no_backup: bool) -> None:
             click.echo()
             click.echo("🔧 Changes applied:")
             for result in successful_refinements:
-                for action in result.actions_applied:
+                for action in result.changes_made:
                     click.echo(f"   • {action}")
         else:
             click.echo("⚠️  No refinements could be applied.")
