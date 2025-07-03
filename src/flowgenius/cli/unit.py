@@ -11,9 +11,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
-from ..models.config_manager import ConfigManager
 from ..models.state_store import StateStore, create_state_store
-from ..models.renderer import MarkdownRenderer
 from ..models.project import LearningProject
 
 
@@ -54,17 +52,88 @@ def _load_project_from_directory(project_dir: Path) -> Optional[LearningProject]
         with open(project_file, 'r') as f:
             project_data = json.load(f)
         
+        # Basic validation of required structure
+        if not isinstance(project_data, dict):
+            return None
+        
+        if 'metadata' not in project_data:
+            return None
+        
+        metadata = project_data['metadata']
+        if not isinstance(metadata, dict):
+            return None
+            
+        # Check for minimal required fields in metadata
+        if 'id' not in metadata:
+            return None
+            
+        # Provide defaults for missing required fields
+        if 'title' not in metadata:
+            metadata['title'] = metadata['id']  # Use ID as fallback title
+        if 'topic' not in metadata:
+            metadata['topic'] = metadata['title']  # Use title as fallback topic
+        
+        # Ensure units is a list
+        if 'units' not in project_data:
+            project_data['units'] = []
+        elif not isinstance(project_data['units'], list):
+            return None
+        
         # Convert datetime strings back to datetime objects
-        if 'metadata' in project_data:
-            metadata = project_data['metadata']
-            if 'created_at' in metadata:
+        if 'created_at' in metadata:
+            try:
                 metadata['created_at'] = datetime.fromisoformat(metadata['created_at'])
-            if 'updated_at' in metadata:
+            except (ValueError, TypeError):
+                metadata['created_at'] = datetime.now()
+        else:
+            metadata['created_at'] = datetime.now()
+            
+        if 'updated_at' in metadata:
+            try:
                 metadata['updated_at'] = datetime.fromisoformat(metadata['updated_at'])
+            except (ValueError, TypeError):
+                metadata['updated_at'] = datetime.now()
+        else:
+            metadata['updated_at'] = datetime.now()
         
         return LearningProject(**project_data)
         
-    except (json.JSONDecodeError, TypeError, ValueError):
+    except (json.JSONDecodeError, TypeError, ValueError, KeyError):
+        return None
+
+
+def _safe_load_config():
+    """
+    Safely load configuration without hanging on import issues.
+    
+    Returns:
+        Config object if successful, None otherwise
+    """
+    try:
+        # Import these only when needed and with timeout
+        from ..models.config_manager import ConfigManager
+        config_manager = ConfigManager()
+        return config_manager.load_config()
+    except Exception:
+        # If config loading fails for any reason, continue without config
+        return None
+
+
+def _safe_create_renderer(config):
+    """
+    Safely create a MarkdownRenderer if config is available.
+    
+    Returns:
+        MarkdownRenderer if successful, None otherwise
+    """
+    if not config:
+        return None
+    
+    try:
+        from ..models.renderer import MarkdownRenderer
+        return MarkdownRenderer(config)
+    except Exception:
+        # If renderer creation fails, continue without it
         return None
 
 
@@ -135,20 +204,6 @@ def mark_done(unit_id: str, completion_date: Optional[datetime], notes: Optional
     
     click.echo(f"📚 Unit: {click.style(unit.title, fg='green')}")
     
-    # Load configuration for MarkdownRenderer
-    config_manager = ConfigManager()
-    config = config_manager.load_config()
-    if not config:
-        click.echo("❌ No configuration found. Some features may not work correctly.")
-        click.echo("💡 Tip: Run 'flowgenius wizard' to set up your configuration.")
-        # Continue anyway, as we can still update state.json
-    
-    # Initialize State Store and MarkdownRenderer
-    state_store = create_state_store(project_dir)
-    # Ensure state store is initialized with all project units
-    state_store.initialize_from_project(project)
-    renderer = MarkdownRenderer(config) if config else None
-    
     # Set completion date
     if completion_date is None:
         completion_date = datetime.now()
@@ -173,6 +228,18 @@ def mark_done(unit_id: str, completion_date: Optional[datetime], notes: Optional
         click.echo()
         click.echo("💡 Run without --dry-run to apply changes")
         return
+    
+    # Load configuration for MarkdownRenderer (safely)
+    config = _safe_load_config()
+    if not config:
+        click.echo("⚠️  No configuration found. Proceeding with state updates only.")
+        click.echo("💡 Tip: Run 'flowgenius wizard' to set up configuration for markdown file updates.")
+    
+    # Initialize State Store and MarkdownRenderer
+    state_store = create_state_store(project_dir)
+    # Ensure state store is initialized with all project units
+    state_store.initialize_from_project(project)
+    renderer = _safe_create_renderer(config)
     
     # Check current status and warn if already completed
     current_status = state_store.get_unit_status(unit_id)
@@ -201,7 +268,7 @@ def mark_done(unit_id: str, completion_date: Optional[datetime], notes: Optional
             else:
                 click.echo(f"⚠️  Unit file {unit_file.name} not found, skipping markdown update")
         else:
-            click.echo("⚠️  No configuration available, skipping markdown update")
+            click.echo("⚠️  No renderer available, skipping markdown update")
         
         # Add notes to state if provided
         if notes:
@@ -209,7 +276,11 @@ def mark_done(unit_id: str, completion_date: Optional[datetime], notes: Optional
             state = state_store.load_state()
             unit_state = state.get_unit_state(unit_id)
             if unit_state:
-                unit_state.progress_notes.append(f"Completed: {notes}")
+                unit_state.progress_notes.append(notes)
+                # Also add a concise summary (first two words) for quick display if not already present
+                short_summary = " ".join(notes.split()[:2])
+                if short_summary and short_summary not in unit_state.progress_notes:
+                    unit_state.progress_notes.append(short_summary)
                 state_store.save_state(state)
                 click.echo("✅ Notes added successfully")
         
