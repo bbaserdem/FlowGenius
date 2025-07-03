@@ -2,15 +2,18 @@
 FlowGenius Feedback Processor
 
 This module processes user feedback to determine specific refinement actions
-for learning units, interfacing with LangChain for intelligent interpretation.
+for learning units using LangChain for intelligent interpretation.
 """
 
 import logging
+import os
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
-from openai import OpenAI
 from pydantic import BaseModel, Field
+
 from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_openai import ChatOpenAI
 
 from .conversation_manager import UserFeedback
 from ..models.project import LearningUnit
@@ -20,374 +23,244 @@ from ..models.settings import DefaultSettings
 logger = logging.getLogger(__name__)
 
 
-class FeedbackCategory(str, Enum):
-    """Categories of feedback for refinement."""
-    CONTENT = "content"
-    RESOURCES = "resources"
-    TASKS = "tasks"
-    DIFFICULTY = "difficulty"
-    STRUCTURE = "structure"
-    OBJECTIVES = "objectives"
-    GENERAL = "general"
+class RefinementAction(str, Enum):
+    """Types of refinement actions that can be taken."""
+    ADD_CONTENT = "add_content"
+    REMOVE_CONTENT = "remove_content"
+    MODIFY_CONTENT = "modify_content"
+    REORDER_CONTENT = "reorder_content"
+    CLARIFY_CONTENT = "clarify_content"
+    EXPAND_CONTENT = "expand_content"
+    SIMPLIFY_CONTENT = "simplify_content"
+    ADD_EXAMPLES = "add_examples"
+    UPDATE_RESOURCES = "update_resources"
+    ADJUST_DIFFICULTY = "adjust_difficulty"
+    NO_ACTION = "no_action"
 
 
-class RefinementAction(BaseModel):
-    """Represents a specific action to refine a unit."""
-    action_type: str = Field(description="Type of refinement action")
-    target_component: str = Field(description="What component to modify")
-    description: str = Field(description="Description of the action")
-    priority: int = Field(description="Priority level (1-5)")
-    details: Dict[str, Any] = Field(default_factory=dict, description="Additional details")
-
-
-class ProcessedFeedback(BaseModel):
-    """Structured analysis of user feedback with refinement actions."""
-    unit_id: str = Field(description="ID of the unit being refined")
-    # Allow mocks or other stand-ins in tests by accepting Any.
-    original_feedback: Any = Field(description="Original feedback (raw UserFeedback object)")
-    categories: List[FeedbackCategory] = Field(description="Identified feedback categories")
-    sentiment: str = Field(description="Overall sentiment: positive, negative, neutral")
-    confidence: float = Field(default=0.75, description="Confidence in analysis (0-1)")
-    refinement_actions: List[RefinementAction] = Field(description="Specific actions to take")
-    summary: str = Field(description="Summary of required changes")
+class RefinementRecommendation(BaseModel):
+    """Structured recommendation for unit refinement based on feedback."""
+    action: RefinementAction = Field(description="The type of refinement action to take")
+    priority: str = Field(description="Priority level: high, medium, or low")
+    target_section: Optional[str] = Field(default=None, description="Specific section to refine")
+    specific_changes: List[str] = Field(default_factory=list, description="List of specific changes to make")
+    reasoning: str = Field(description="Explanation of why this refinement is recommended")
+    estimated_impact: str = Field(description="Expected impact on learning effectiveness")
 
 
 class FeedbackProcessor:
     """
     Processes user feedback to determine specific refinement actions for learning units.
     
-    This class analyzes feedback using AI to extract actionable insights and
-    interfaces with LangChain for intelligent interpretation.
+    This class analyzes feedback using LangChain to extract actionable insights.
     """
     
-    def __init__(self, openai_client: OpenAI, model: str = DefaultSettings.DEFAULT_MODEL) -> None:
+    def __init__(self, model_name: str = DefaultSettings.DEFAULT_MODEL) -> None:
         """
-        Initialize the feedback processor.
+        Initialize the feedback processor with LangChain components.
         
         Args:
-            openai_client: OpenAI client for AI processing
-            model: OpenAI model to use for analysis
+            model_name: Name of the OpenAI model to use
         """
-        self.client = openai_client
-        self.model = model
+        self.model_name = model_name
+        self.chat_model = ChatOpenAI(model=model_name, temperature=0.3)
+        self.refinement_cache: Dict[str, RefinementRecommendation] = {}
         
-        # Prompt template for feedback analysis
-        self.analysis_prompt = PromptTemplate(
-            input_variables=["feedback_text", "unit_context"],
+        # Set up output parser for structured responses
+        self.output_parser = JsonOutputParser(pydantic_object=RefinementRecommendation)
+        
+        # Create prompt template with LangChain
+        self.prompt = PromptTemplate(
+            input_variables=["feedback_text", "unit_title", "unit_content", "format_instructions"],
             template="""
-            You are an expert learning experience analyst. Analyze the following user feedback 
-            about a learning unit and determine specific refinement actions.
+You are an AI learning assistant analyzing user feedback to recommend specific refinements for a learning unit.
 
-            Unit Context:
-            {unit_context}
+Learning Unit: {unit_title}
+Current Content Summary: {unit_content}
 
-            User Feedback:
-            {feedback_text}
+User Feedback:
+{feedback_text}
 
-            Please analyze this feedback and provide:
-            1. The main categories of feedback (content, resources, tasks, difficulty, structure, objectives)
-            2. Specific actionable changes needed
-            3. Priority level for each change (1=low, 5=critical)
-            4. Overall sentiment (positive, negative, neutral)
+Analyze this feedback and provide a structured recommendation for improving the learning unit.
 
-            Format your response as structured analysis focusing on actionable improvements.
-            """
+{format_instructions}
+
+Focus on:
+1. Understanding the user's core concern or suggestion
+2. Identifying the most impactful refinement action
+3. Providing specific, actionable changes
+4. Explaining the reasoning behind your recommendation
+5. Estimating the impact on learning effectiveness
+
+Remember to be specific and practical in your recommendations.
+"""
         )
+        
+        # Create the analysis chain
+        self.analysis_chain = self.prompt | self.chat_model | self.output_parser
     
-    def process_feedback(self, feedback: UserFeedback, unit: LearningUnit) -> ProcessedFeedback:
+    def analyze_feedback(self, feedback: UserFeedback, unit: LearningUnit) -> RefinementRecommendation:
         """
-        Process user feedback and generate refinement actions.
+        Analyze user feedback to generate refinement recommendations using LangChain.
         
         Args:
-            feedback: UserFeedback object to analyze
-            unit: LearningUnit being refined
+            feedback: User feedback to analyze
+            unit: Learning unit being refined
             
         Returns:
-            ProcessedFeedback with analysis and actions
+            Structured refinement recommendation
         """
-        # Prepare unit context
-        unit_context = self._format_unit_context(unit)
-        
-        # Analyze feedback with AI
-        analysis = self._analyze_feedback_with_ai(feedback.feedback_text, unit_context)
-        
-        # Extract categories
-        categories = self._extract_categories(feedback.feedback_text)
-        
-        # Generate refinement actions
-        actions = self._generate_refinement_actions(feedback, unit, analysis)
-        
-        # Determine sentiment and confidence
-        sentiment = self._analyze_sentiment(feedback.feedback_text)
-        confidence = self._calculate_confidence(feedback, analysis)
-        
-        # Create summary
-        summary = self._generate_summary(actions)
-        
-        return ProcessedFeedback(
-            unit_id=feedback.unit_id,
-            original_feedback=feedback,
-            categories=categories,
-            sentiment=sentiment,
-            confidence=confidence,
-            refinement_actions=actions,
-            summary=summary
-        )
-    
-    def batch_process_feedback(self, feedback_list: List[UserFeedback], unit: LearningUnit) -> List[ProcessedFeedback]:
-        """
-        Process multiple feedback items for the same unit.
-        
-        Args:
-            feedback_list: List of UserFeedback objects
-            unit: LearningUnit being refined
-            
-        Returns:
-            List of ProcessedFeedback objects
-        """
-        return [self.process_feedback(feedback, unit) for feedback in feedback_list]
-    
-    def consolidate_feedback(self, processed_feedback: List[ProcessedFeedback]) -> Dict[str, Any]:
-        """
-        Consolidate multiple feedback analyses into a unified refinement plan.
-        
-        Args:
-            processed_feedback: List of ProcessedFeedback objects
-            
-        Returns:
-            Consolidated refinement plan
-        """
-        if not processed_feedback:
-            return {"actions": [], "summary": "No feedback to process"}
-        
-        # Combine all actions
-        all_actions = []
-        for pf in processed_feedback:
-            all_actions.extend(pf.refinement_actions)
-        
-        # Group actions by type and priority
-        actions_by_type = {}
-        for action in all_actions:
-            if action.action_type not in actions_by_type:
-                actions_by_type[action.action_type] = []
-            actions_by_type[action.action_type].append(action)
-        
-        # Sort by priority
-        consolidated_actions = []
-        for action_type, actions in actions_by_type.items():
-            # Take highest priority action of each type
-            top_action = max(actions, key=lambda a: a.priority)
-            consolidated_actions.append(top_action)
-        
-        consolidated_actions.sort(key=lambda a: a.priority, reverse=True)
-        
-        return {
-            "actions": consolidated_actions,
-            "summary": f"Consolidated {len(all_actions)} feedback items into {len(consolidated_actions)} refinement actions",
-            "feedback_count": len(processed_feedback),
-            "categories_mentioned": list(set(cat for pf in processed_feedback for cat in pf.categories))
-        }
-    
-    def _format_unit_context(self, unit: LearningUnit) -> str:
-        """Format unit information for AI analysis."""
-        context = f"""
-        Unit: {unit.title}
-        Description: {unit.description}
-        
-        Learning Objectives:
-        {"\n".join(f"- {obj}" for obj in unit.learning_objectives)}
-        
-        Current Resources ({len(unit.resources)}):
-        {"\n".join(f"- {r.title} ({r.type}): {r.description}" for r in unit.resources)}
-        
-        Current Tasks ({len(unit.engage_tasks)}):
-        {"\n".join(f"- {t.title} ({t.type}): {t.description}" for t in unit.engage_tasks)}
-        """.strip()
-        
-        return context
-    
-    def _analyze_feedback_with_ai(self, feedback_text: str, unit_context: str) -> str:
-        """Use AI to analyze feedback and suggest actions."""
         try:
-            prompt = self.analysis_prompt.format(
-                feedback_text=feedback_text,
-                unit_context=unit_context
-            )
+            # Prepare unit content summary
+            unit_content = self._summarize_unit_content(unit)
             
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are an expert learning experience analyst."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=800,
-                temperature=0.3
-            )
+            # Get format instructions from the parser
+            format_instructions = self.output_parser.get_format_instructions()
             
-            return response.choices[0].message.content.strip()
+            # Run the analysis chain
+            recommendation = self.analysis_chain.invoke({
+                "feedback_text": feedback.feedback_text,
+                "unit_title": unit.title,
+                "unit_content": unit_content,
+                "format_instructions": format_instructions
+            })
             
-        except (ValueError, AttributeError) as e:
-            logger.error(f"AI analysis failed: {e}", exc_info=True)
-            return f"Analysis error: {str(e)}. Basic interpretation: User provided feedback about the learning unit."
+            # Ensure it's a proper RefinementRecommendation object
+            if isinstance(recommendation, dict):
+                recommendation = RefinementRecommendation(**recommendation)
+            
+            return recommendation
+            
+        except Exception as e:
+            logger.error(f"Error analyzing feedback with LangChain: {e}", exc_info=True)
+            return self._analyze_feedback_fallback(feedback, unit)
     
-    def _extract_categories(self, feedback_text: str) -> List[FeedbackCategory]:
-        """Extract feedback categories from text using keyword analysis."""
-        categories = []
-        feedback_lower = feedback_text.lower()
+    def _summarize_unit_content(self, unit: LearningUnit) -> str:
+        """
+        Create a summary of the unit content for analysis.
         
-        # Category keywords mapping
-        category_keywords = {
-            FeedbackCategory.CONTENT: ["content", "material", "information", "explanation", "concept", "theory"],
-            FeedbackCategory.RESOURCES: ["resource", "video", "article", "reading", "link", "documentation"],
-            FeedbackCategory.TASKS: ["task", "exercise", "practice", "assignment", "activity", "activities", "project"],
-            FeedbackCategory.DIFFICULTY: ["difficult", "hard", "easy", "easier", "simple", "complex", "level", "challenging"],
-            FeedbackCategory.STRUCTURE: ["structure", "organization", "order", "sequence", "flow", "layout"],
-            FeedbackCategory.OBJECTIVES: ["objective", "goal", "outcome", "learning", "understand", "master"]
-        }
+        Args:
+            unit: Learning unit to summarize
+            
+        Returns:
+            Summary string
+        """
+        summary_parts = [
+            f"Description: {unit.description}",
+            f"Learning Objectives: {len(unit.learning_objectives)} objectives",
+        ]
         
-        for category, keywords in category_keywords.items():
-            if any(keyword in feedback_lower for keyword in keywords):
-                categories.append(category)
+        if unit.resources:
+            summary_parts.append(f"Resources: {len(unit.resources)} resources")
+            
+        if unit.engage_tasks:
+            summary_parts.append(f"Tasks: {len(unit.engage_tasks)} engage tasks")
+            
+        if unit.estimated_duration:
+            summary_parts.append(f"Duration: {unit.estimated_duration}")
         
-        # Default to general if no specific categories found
-        if not categories:
-            categories.append(FeedbackCategory.GENERAL)
-        
-        return categories
+        return "\n".join(summary_parts)
     
-    def _generate_refinement_actions(self, feedback: UserFeedback, unit: LearningUnit, analysis: str) -> List[RefinementAction]:
-        """Generate specific refinement actions based on feedback analysis."""
-        actions = []
+    def _analyze_feedback_fallback(self, feedback: UserFeedback, unit: LearningUnit) -> RefinementRecommendation:
+        """
+        Fallback analysis when LLM is not available.
+        
+        Args:
+            feedback: User feedback to analyze
+            unit: Learning unit being refined
+            
+        Returns:
+            Basic refinement recommendation
+        """
+        # Simple keyword-based analysis
         feedback_lower = feedback.feedback_text.lower()
         
-        # Generate actions based on feedback categories
-        if "resource" in feedback_lower:
-            if "more" in feedback_lower or "additional" in feedback_lower:
-                actions.append(RefinementAction(
-                    action_type="add_resources",
-                    target_component="resources",
-                    description="Add additional learning resources to the unit",
-                    priority=3,
-                    details={"resource_types": ["video", "article"], "count": 2}
-                ))
-            elif "better" in feedback_lower or "different" in feedback_lower:
-                actions.append(RefinementAction(
-                    action_type="replace_resources",
-                    target_component="resources",
-                    description="Replace existing resources with better alternatives",
-                    priority=4,
-                    details={"replace_count": 1}
-                ))
+        action = RefinementAction.NO_ACTION
+        priority = "medium"
+        specific_changes = []
+        reasoning = "Analyzed based on keyword patterns in feedback"
         
-        if "task" in feedback_lower or "exercise" in feedback_lower:
-            if "more" in feedback_lower:
-                actions.append(RefinementAction(
-                    action_type="add_tasks",
-                    target_component="engage_tasks",
-                    description="Add more engaging tasks to the unit",
-                    priority=3,
-                    details={"task_types": ["practice", "reflection"], "count": 1}
-                ))
-            elif "easier" in feedback_lower:
-                actions.append(RefinementAction(
-                    action_type="simplify_tasks",
-                    target_component="engage_tasks",
-                    description="Make existing tasks easier or more accessible",
-                    priority=4,
-                    details={"adjustment": "reduce_complexity"}
-                ))
+        if any(word in feedback_lower for word in ["add", "more", "include", "missing"]):
+            action = RefinementAction.ADD_CONTENT
+            specific_changes = ["Add more content based on user feedback"]
+            reasoning = "User indicated content is missing or insufficient"
+        elif any(word in feedback_lower for word in ["remove", "delete", "too much", "unnecessary"]):
+            action = RefinementAction.REMOVE_CONTENT
+            specific_changes = ["Remove excessive content"]
+            reasoning = "User indicated some content is unnecessary"
+        elif any(word in feedback_lower for word in ["confusing", "unclear", "don't understand"]):
+            action = RefinementAction.CLARIFY_CONTENT
+            specific_changes = ["Clarify confusing sections"]
+            reasoning = "User found content unclear or confusing"
+        elif any(word in feedback_lower for word in ["example", "demonstrate", "show"]):
+            action = RefinementAction.ADD_EXAMPLES
+            specific_changes = ["Add practical examples"]
+            reasoning = "User requested examples or demonstrations"
         
-        if "difficult" in feedback_lower or "hard" in feedback_lower:
-            actions.append(RefinementAction(
-                action_type="reduce_difficulty",
-                target_component="content",
-                description="Reduce complexity and add more scaffolding",
-                priority=5,
-                details={"add_prerequisites": True, "simplify_language": True}
-            ))
-        
-        if "easy" in feedback_lower or "simple" in feedback_lower:
-            actions.append(RefinementAction(
-                action_type="increase_difficulty",
-                target_component="content",
-                description="Add more challenging elements and advanced concepts",
-                priority=3,
-                details={"add_advanced_topics": True, "increase_depth": True}
-            ))
-        
-        # General content improvements
-        if "unclear" in feedback_lower or "confusing" in feedback_lower:
-            actions.append(RefinementAction(
-                action_type="clarify_content",
-                target_component="description",
-                description="Clarify unit description and learning objectives",
-                priority=4,
-                details={"rewrite_description": True, "add_examples": True}
-            ))
-        
-        # Default action if no specific patterns found
-        if not actions:
-            actions.append(RefinementAction(
-                action_type="general_review",
-                target_component="unit",
-                description="General review and improvement of unit content",
-                priority=2,
-                details={"review_all_components": True}
-            ))
-        
-        return actions
+        return RefinementRecommendation(
+            action=action,
+            priority=priority,
+            target_section=None,
+            specific_changes=specific_changes,
+            reasoning=reasoning,
+            estimated_impact="Medium - Based on keyword analysis"
+        )
     
-    def _analyze_sentiment(self, feedback_text: str) -> str:
-        """Analyze sentiment of feedback."""
-        positive_words = ["good", "great", "excellent", "helpful", "clear", "useful", "love", "like"]
-        negative_words = ["bad", "poor", "terrible", "confusing", "unclear", "difficult", "hate", "dislike"]
+    def process_feedback_batch(self, feedbacks: List[UserFeedback], unit: LearningUnit) -> List[RefinementRecommendation]:
+        """
+        Process multiple feedback items for a unit.
         
-        feedback_lower = feedback_text.lower()
-        positive_count = sum(1 for word in positive_words if word in feedback_lower)
-        negative_count = sum(1 for word in negative_words if word in feedback_lower)
+        Args:
+            feedbacks: List of feedback to process
+            unit: Learning unit being refined
+            
+        Returns:
+            List of refinement recommendations
+        """
+        recommendations = []
         
-        if positive_count > negative_count:
-            return "positive"
-        elif negative_count > positive_count:
-            return "negative"
-        else:
-            return "neutral"
+        for feedback in feedbacks:
+            try:
+                recommendation = self.analyze_feedback(feedback, unit)
+                recommendations.append(recommendation)
+            except Exception as e:
+                logger.error(f"Error processing feedback {feedback.feedback_text[:50]}...: {e}")
+                continue
+        
+        return recommendations
     
-    def _calculate_confidence(self, feedback: UserFeedback, analysis: str) -> float:
-        """Calculate confidence in the analysis."""
-        # Simple heuristic based on feedback length and specificity
-        feedback_length = len(feedback.feedback_text.split())
-        specificity_indicators = len(feedback.specific_concerns) + len(feedback.suggested_changes)
+    def prioritize_recommendations(self, recommendations: List[RefinementRecommendation]) -> List[RefinementRecommendation]:
+        """
+        Prioritize and deduplicate recommendations.
         
-        # Base confidence on length and specificity
-        confidence = min(0.5 + (feedback_length / 100) + (specificity_indicators * 0.1), 1.0)
+        Args:
+            recommendations: List of recommendations to prioritize
+            
+        Returns:
+            Prioritized list of recommendations
+        """
+        # Sort by priority
+        priority_order = {"high": 0, "medium": 1, "low": 2}
+        sorted_recs = sorted(
+            recommendations,
+            key=lambda r: priority_order.get(r.priority, 3)
+        )
         
-        return round(confidence, 2)
-    
-    def _generate_summary(self, actions: List[RefinementAction]) -> str:
-        """Generate a summary of refinement actions."""
-        if not actions:
-            return "No specific refinement actions identified."
+        # Simple deduplication by action type
+        seen_actions = set()
+        unique_recs = []
         
-        high_priority = [a for a in actions if a.priority >= 4]
-        medium_priority = [a for a in actions if a.priority == 3]
-        low_priority = [a for a in actions if a.priority < 3]
+        for rec in sorted_recs:
+            if rec.action not in seen_actions or rec.priority == "high":
+                unique_recs.append(rec)
+                seen_actions.add(rec.action)
         
-        summary_parts = []
-        
-        if high_priority:
-            summary_parts.append(f"High priority: {len(high_priority)} critical improvements needed")
-        if medium_priority:
-            summary_parts.append(f"Medium priority: {len(medium_priority)} moderate improvements")
-        if low_priority:
-            summary_parts.append(f"Low priority: {len(low_priority)} minor enhancements")
-        
-        return "; ".join(summary_parts)
+        return unique_recs
 
 
 def create_feedback_processor(api_key: Optional[str] = None, model: str = DefaultSettings.DEFAULT_MODEL) -> FeedbackProcessor:
     """
-    Factory function to create a FeedbackProcessor with OpenAI client.
+    Factory function to create a FeedbackProcessor with LangChain.
     
     Args:
         api_key: OpenAI API key. If None, will try to get from environment
@@ -398,15 +271,15 @@ def create_feedback_processor(api_key: Optional[str] = None, model: str = Defaul
     """
     try:
         if api_key:
-            client = OpenAI(api_key=api_key)
-        else:
-            client = OpenAI()
+            os.environ["OPENAI_API_KEY"] = api_key
+        elif "OPENAI_API_KEY" not in os.environ:
+            raise RuntimeError("OpenAI API key not provided and OPENAI_API_KEY environment variable not set")
         
-        return FeedbackProcessor(client, model)
+        return FeedbackProcessor(model)
     
     except ImportError as e:
-        logger.error(f"Failed to import OpenAI: {e}")
-        raise RuntimeError(f"Failed to create FeedbackProcessor: OpenAI package not installed") from e
+        logger.error(f"Failed to import required packages: {e}")
+        raise RuntimeError(f"Failed to create FeedbackProcessor: Required packages not installed") from e
     except Exception as e:
         logger.error(f"Failed to create FeedbackProcessor: {e}", exc_info=True)
         raise RuntimeError(f"Failed to create FeedbackProcessor: {str(e)}") from e 

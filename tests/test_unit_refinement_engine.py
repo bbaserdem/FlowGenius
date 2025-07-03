@@ -11,8 +11,8 @@ from flowgenius.agents.unit_refinement_engine import (
     RefinementResult,
     create_unit_refinement_engine
 )
-from flowgenius.agents.feedback_processor import ProcessedFeedback, RefinementAction, FeedbackCategory
-from flowgenius.models.project import LearningUnit, LearningResource, EngageTask
+from flowgenius.agents.feedback_processor import RefinementRecommendation, RefinementAction
+from flowgenius.models.project import LearningUnit, LearningResource, EngageTask, UserFeedback
 
 
 class TestRefinementResult:
@@ -70,259 +70,210 @@ class TestUnitRefinementEngine:
         assert engine.content_generator is not None
         assert engine.resource_curator is not None
         assert engine.task_generator is not None
+        assert engine.feedback_processor is not None
 
-    def test_apply_refinement_empty_actions(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
-        """Test refinement application with empty actions list."""
+    def test_apply_refinement_no_action(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
+        """Test refinement application when no action is needed."""
         engine = UnitRefinementEngine(mock_openai_client)
         
-        processed_feedback = ProcessedFeedback(
+        feedback = UserFeedback(
             unit_id="unit-1",
-            original_feedback=Mock(),
-            categories=[FeedbackCategory.GENERAL],
-            sentiment="neutral",
-            refinement_actions=[],
-            summary="No specific actions needed"
+            feedback_text="This looks good overall",
+            timestamp="2024-01-01T10:00:00"
         )
         
-        result = engine.apply_refinement(sample_learning_unit, processed_feedback)
-        
-        assert isinstance(result, RefinementResult)
-        assert result.unit_id == sample_learning_unit.id
-        assert result.success is True
-        assert len(result.changes_made) == 0
-        assert "0 changes" in result.reasoning
-
-    def test_apply_refinement_add_resources(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
-        """Test refinement application for adding resources."""
-        engine = UnitRefinementEngine(mock_openai_client)
-        
-        action = RefinementAction(
-            action_type="add_resources",
-            target_component="resources",
-            description="Add more video resources",
-            priority=4,
-            details={"types": ["video"], "count": 2}
-        )
-        
-        processed_feedback = ProcessedFeedback(
-            unit_id="unit-1",
-            original_feedback=Mock(),
-            categories=[FeedbackCategory.RESOURCES],
-            sentiment="neutral",
-            refinement_actions=[action],
-            summary="User needs more video resources"
-        )
-        
-        # Mock the resource curator response
-        with patch.object(engine.resource_curator, 'curate_resources') as mock_curate:
-            mock_curate.return_value = ([LearningResource(title="New Resource", url="http://example.com", type="video")], {"success": True, "count": 1})
-            
-            result = engine.apply_refinement(sample_learning_unit, processed_feedback)
-            
-            assert result.success is True
-            assert "Added 1 new resources" in result.changes_made[0]
-            assert "resources" in result.updated_components
-            assert len(result.refined_unit.resources) == len(sample_learning_unit.resources) + 1
-            mock_curate.assert_called_once()
-
-    def test_apply_refinement_add_tasks(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
-        """Test refinement application for adding tasks."""
-        engine = UnitRefinementEngine(mock_openai_client)
-        
-        action = RefinementAction(
-            action_type="add_tasks",
-            target_component="engage_tasks",
-            description="Add more practice tasks",
-            priority=3,
-            details={"count": 2}
-        )
-        
-        processed_feedback = ProcessedFeedback(
-            unit_id="unit-1",
-            original_feedback=Mock(),
-            categories=[FeedbackCategory.TASKS],
-            sentiment="neutral",
-            refinement_actions=[action],
-            summary="User needs more practice tasks"
-        )
-        
-        # Mock the task generator response
-        with patch.object(engine.task_generator, 'generate_tasks') as mock_generate:
-            mock_generate.return_value = ([EngageTask(title="New Task", description="Do it", type="practice")], {"success": True, "count": 1})
-            
-            result = engine.apply_refinement(sample_learning_unit, processed_feedback)
-            
-            assert result.success is True
-            assert "Added 1 new engage task" in result.changes_made[0]
-            assert "engage_tasks" in result.updated_components
-            assert len(result.refined_unit.engage_tasks) == len(sample_learning_unit.engage_tasks) + 1
-            mock_generate.assert_called_once()
-
-    def test_apply_refinement_update_content(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
-        """Test refinement application for updating content."""
-        engine = UnitRefinementEngine(mock_openai_client)
-        
-        action = RefinementAction(
-            action_type="clarify_content",
-            target_component="description",
-            description="Make content clearer",
-            priority=4
-        )
-        
-        processed_feedback = ProcessedFeedback(
-            unit_id="unit-1",
-            original_feedback=Mock(),
-            categories=[FeedbackCategory.CONTENT],
-            sentiment="negative",
-            refinement_actions=[action],
-            summary="Content needs clarification"
-        )
-        
-        # Mock the content generator response
-        with patch.object(engine.content_generator, 'generate_complete_content') as mock_generate:
-            from flowgenius.agents.content_generator import GeneratedContent
-            # Create a proper GeneratedContent object
-            generated_content = GeneratedContent(
-                unit_id="unit-1",
-                resources=[],
-                engage_tasks=[],
-                formatted_resources=[],
-                formatted_tasks=[],
-                generation_success=True,
-                generation_notes=["Content updated successfully"]
+        # Mock the feedback processor to return NO_ACTION
+        with patch.object(engine.feedback_processor, 'analyze_feedback') as mock_analyze:
+            mock_analyze.return_value = RefinementRecommendation(
+                action=RefinementAction.NO_ACTION,
+                priority="low",
+                reasoning="No specific changes needed",
+                estimated_impact="Low"
             )
-            mock_generate.return_value = generated_content
             
-            result = engine.apply_refinement(sample_learning_unit, processed_feedback)
+            result = engine.apply_refinement(sample_learning_unit, feedback)
             
+            assert isinstance(result, RefinementResult)
+            assert result.unit_id == sample_learning_unit.id
             assert result.success is True
-            assert "Updated content" in result.changes_made[0]
-            assert "content" in result.updated_components
-            
-            # Verify the refined unit was updated and the original was not
-            # Note: The current implementation adds a prefix to the description
-            assert "[Clarified]" in result.refined_unit.description
-            assert result.refined_unit.title == sample_learning_unit.title  # Title should remain the same
-            assert sample_learning_unit.description != result.refined_unit.description
+            assert "No changes needed" in result.changes_made[0]
 
-    def test_apply_refinement_reduce_difficulty(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
-        """Test refinement application for reducing difficulty."""
+    def test_apply_refinement_add_content(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
+        """Test refinement application for adding content (resources)."""
         engine = UnitRefinementEngine(mock_openai_client)
         
-        action = RefinementAction(
-            action_type="reduce_difficulty",
-            target_component="content",
-            description="Make content easier for beginners",
-            priority=5
-        )
-        
-        processed_feedback = ProcessedFeedback(
+        feedback = UserFeedback(
             unit_id="unit-1",
-            original_feedback=Mock(),
-            categories=[FeedbackCategory.DIFFICULTY],
-            sentiment="negative",
-            refinement_actions=[action],
-            summary="Content too difficult"
+            feedback_text="I need more video resources",
+            timestamp="2024-01-01T10:00:00"
         )
         
-        # Mock the content generator for content updates
-        with patch.object(engine.content_generator, 'generate_complete_content') as mock_generate:
-            from flowgenius.agents.content_generator import GeneratedContent
-            # Create a proper GeneratedContent object
-            generated_content = GeneratedContent(
-                unit_id="unit-1",
-                resources=[],
-                engage_tasks=[],
-                formatted_resources=[],
-                formatted_tasks=[],
-                generation_success=True,
-                generation_notes=["Content simplified successfully"]
+        # Mock the feedback processor
+        with patch.object(engine.feedback_processor, 'analyze_feedback') as mock_analyze:
+            mock_analyze.return_value = RefinementRecommendation(
+                action=RefinementAction.ADD_CONTENT,
+                priority="high",
+                specific_changes=["Add video tutorials"],
+                reasoning="User needs visual learning materials",
+                estimated_impact="High"
             )
-            mock_generate.return_value = generated_content
             
-            result = engine.apply_refinement(sample_learning_unit, processed_feedback)
-            
-            assert result.success is True
-            assert "Updated content" in result.changes_made[0]
-            assert "content" in result.updated_components
-            assert "[Simplified for beginners]" in result.refined_unit.description
+            # Mock the resource curator response
+            with patch.object(engine.resource_curator, 'curate_resources') as mock_curate:
+                mock_curate.return_value = ([LearningResource(title="New Resource", url="http://example.com", type="video")], {"success": True, "count": 1})
+                
+                result = engine.apply_refinement(sample_learning_unit, feedback)
+                
+                assert result.success is True
+                assert "Added 1 new resources" in result.changes_made[0]
+                assert "resources" in result.updated_components
+                assert len(result.refined_unit.resources) == len(sample_learning_unit.resources) + 1
+                mock_curate.assert_called_once()
 
-    def test_apply_refinement_multiple_actions(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
-        """Test refinement application with multiple actions."""
+    def test_apply_refinement_add_examples(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
+        """Test refinement application for adding examples (tasks)."""
         engine = UnitRefinementEngine(mock_openai_client)
         
-        actions = [
-            RefinementAction(
-                action_type="add_resources",
-                target_component="resources",
-                description="Add video resources",
-                priority=4
-            ),
-            RefinementAction(
-                action_type="add_tasks",
-                target_component="engage_tasks",
-                description="Add practice tasks",
-                priority=3
-            )
-        ]
-        
-        processed_feedback = ProcessedFeedback(
+        feedback = UserFeedback(
             unit_id="unit-1",
-            original_feedback=Mock(),
-            categories=[FeedbackCategory.RESOURCES, FeedbackCategory.TASKS],
-            sentiment="neutral",
-            refinement_actions=actions,
-            summary="Need more resources and tasks"
+            feedback_text="I need more practice examples",
+            timestamp="2024-01-01T10:00:00"
         )
         
-        # Mock agent responses
-        with patch.object(engine.resource_curator, 'curate_resources') as mock_curate, \
-             patch.object(engine.task_generator, 'generate_tasks') as mock_generate:
+        # Mock the feedback processor
+        with patch.object(engine.feedback_processor, 'analyze_feedback') as mock_analyze:
+            mock_analyze.return_value = RefinementRecommendation(
+                action=RefinementAction.ADD_EXAMPLES,
+                priority="high",
+                specific_changes=["Add practice exercises"],
+                reasoning="User needs hands-on practice",
+                estimated_impact="High"
+            )
             
-            mock_curate.return_value = ([LearningResource(title="New Resource", url="http://example.com", type="video")], {"success": True, "count": 1})
-            mock_generate.return_value = ([EngageTask(title="New Task", description="Do it", type="practice")], {"success": True, "count": 1})
+            # Mock the task generator response
+            with patch.object(engine.task_generator, 'generate_tasks') as mock_generate:
+                mock_generate.return_value = ([EngageTask(title="New Task", description="Do it", type="practice")], {"success": True, "count": 1})
+                
+                result = engine.apply_refinement(sample_learning_unit, feedback)
+                
+                assert result.success is True
+                assert "Added 1 new engage task as examples" in result.changes_made[0]
+                assert "engage_tasks" in result.updated_components
+                assert len(result.refined_unit.engage_tasks) == len(sample_learning_unit.engage_tasks) + 1
+                mock_generate.assert_called_once()
+
+    def test_apply_refinement_clarify_content(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
+        """Test refinement application for clarifying content."""
+        engine = UnitRefinementEngine(mock_openai_client)
+        
+        feedback = UserFeedback(
+            unit_id="unit-1",
+            feedback_text="This content is confusing",
+            timestamp="2024-01-01T10:00:00"
+        )
+        
+        # Mock the feedback processor
+        with patch.object(engine.feedback_processor, 'analyze_feedback') as mock_analyze:
+            mock_analyze.return_value = RefinementRecommendation(
+                action=RefinementAction.CLARIFY_CONTENT,
+                priority="high",
+                specific_changes=["Clarify the explanation"],
+                reasoning="Content needs clarification",
+                estimated_impact="High"
+            )
             
-            result = engine.apply_refinement(sample_learning_unit, processed_feedback)
+            # Mock the content generator response
+            with patch.object(engine.content_generator, 'generate_complete_content') as mock_generate:
+                from flowgenius.agents.content_generator import GeneratedContent
+                generated_content = GeneratedContent(
+                    unit_id="unit-1",
+                    resources=[],
+                    engage_tasks=[],
+                    formatted_resources=[],
+                    formatted_tasks=[],
+                    generation_success=True,
+                    generation_notes=["Content updated successfully"]
+                )
+                mock_generate.return_value = generated_content
+                
+                result = engine.apply_refinement(sample_learning_unit, feedback)
+                
+                assert result.success is True
+                assert "Updated content" in result.changes_made[0]
+                assert "content" in result.updated_components
+                assert "[Clarified]" in result.refined_unit.description
+
+    def test_apply_refinement_simplify_content(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
+        """Test refinement application for simplifying content."""
+        engine = UnitRefinementEngine(mock_openai_client)
+        
+        feedback = UserFeedback(
+            unit_id="unit-1",
+            feedback_text="This is too difficult for beginners",
+            timestamp="2024-01-01T10:00:00"
+        )
+        
+        # Mock the feedback processor
+        with patch.object(engine.feedback_processor, 'analyze_feedback') as mock_analyze:
+            mock_analyze.return_value = RefinementRecommendation(
+                action=RefinementAction.SIMPLIFY_CONTENT,
+                priority="high",
+                specific_changes=["Simplify for beginners"],
+                reasoning="Content too difficult",
+                estimated_impact="High"
+            )
             
-            assert result.success is True
-            assert len(result.changes_made) == 2
-            assert "Added 1 new resources" in result.changes_made[0]
-            assert "Added 1 new engage task" in result.changes_made[1]
-            assert "resources" in result.updated_components
-            assert "engage_tasks" in result.updated_components
+            # Mock the content generator
+            with patch.object(engine.content_generator, 'generate_complete_content') as mock_generate:
+                from flowgenius.agents.content_generator import GeneratedContent
+                generated_content = GeneratedContent(
+                    unit_id="unit-1",
+                    resources=[],
+                    engage_tasks=[],
+                    formatted_resources=[],
+                    formatted_tasks=[],
+                    generation_success=True,
+                    generation_notes=["Content simplified successfully"]
+                )
+                mock_generate.return_value = generated_content
+                
+                result = engine.apply_refinement(sample_learning_unit, feedback)
+                
+                assert result.success is True
+                assert "Updated content" in result.changes_made[0]
+                assert "content" in result.updated_components
+                assert "[Simplified]" in result.refined_unit.description
 
     def test_apply_refinement_with_errors(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test refinement application when errors occur."""
         engine = UnitRefinementEngine(mock_openai_client)
         
-        action = RefinementAction(
-            action_type="add_resources",
-            target_component="resources",
-            description="Add resources",
-            priority=4
-        )
-        
-        processed_feedback = ProcessedFeedback(
+        feedback = UserFeedback(
             unit_id="unit-1",
-            original_feedback=Mock(),
-            categories=[FeedbackCategory.RESOURCES],
-            sentiment="neutral",
-            refinement_actions=[action],
-            summary="Need resources"
+            feedback_text="Need more resources",
+            timestamp="2024-01-01T10:00:00"
         )
         
-        # Mock agent to raise an exception - this will trigger the except block
-        with patch.object(engine.resource_curator, 'curate_resources') as mock_curate:
-            mock_curate.side_effect = ValueError("Resource curation failed")
+        # Mock the feedback processor
+        with patch.object(engine.feedback_processor, 'analyze_feedback') as mock_analyze:
+            mock_analyze.return_value = RefinementRecommendation(
+                action=RefinementAction.ADD_CONTENT,
+                priority="high",
+                specific_changes=["Add resources"],
+                reasoning="Need resources",
+                estimated_impact="High"
+            )
             
-            result = engine.apply_refinement(sample_learning_unit, processed_feedback)
-            
-            # When an exception occurs, it's caught and added to errors
-            assert result.success is False
-            assert len(result.errors) > 0
-            assert "Resource curation failed" in str(result.errors[0])
-            # The original unit should be returned with no changes
-            assert len(result.refined_unit.resources) == len(sample_learning_unit.resources)
+            # Mock agent to raise an exception
+            with patch.object(engine.resource_curator, 'curate_resources') as mock_curate:
+                mock_curate.side_effect = ValueError("Resource curation failed")
+                
+                result = engine.apply_refinement(sample_learning_unit, feedback)
+                
+                assert result.success is False
+                assert len(result.errors) > 0
+                assert "Resource curation failed" in str(result.errors[0])
+                assert len(result.refined_unit.resources) == len(sample_learning_unit.resources)
 
     def test_batch_apply_refinements(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test batch application of refinements."""
@@ -334,111 +285,49 @@ class TestUnitRefinementEngine:
             sample_learning_unit.model_copy(update={"id": "unit-2", "title": "Advanced Python"})
         ]
         
-        # Create processed feedback for each unit
+        # Create feedback for each unit
         feedback_list = [
-            ProcessedFeedback(
+            UserFeedback(
                 unit_id="unit-1",
-                original_feedback=Mock(),
-                categories=[FeedbackCategory.RESOURCES],
-                sentiment="neutral",
-                refinement_actions=[
-                    RefinementAction(
-                        action_type="add_resources",
-                        target_component="resources",
-                        description="Add resources",
-                        priority=3
-                    )
-                ],
-                summary="Need resources"
+                feedback_text="Need more resources",
+                timestamp="2024-01-01T10:00:00"
             ),
-            ProcessedFeedback(
+            UserFeedback(
                 unit_id="unit-2",
-                original_feedback=Mock(),
-                categories=[FeedbackCategory.TASKS],
-                sentiment="neutral",
-                refinement_actions=[
-                    RefinementAction(
-                        action_type="add_tasks",
-                        target_component="engage_tasks",
-                        description="Add tasks",
-                        priority=3
-                    )
-                ],
-                summary="Need tasks"
+                feedback_text="Need more tasks",
+                timestamp="2024-01-01T10:00:00"
             )
         ]
         
-        with patch.object(engine.resource_curator, 'curate_resources') as mock_curate, \
-             patch.object(engine.task_generator, 'generate_tasks') as mock_generate:
+        # Mock the feedback processor
+        with patch.object(engine.feedback_processor, 'analyze_feedback') as mock_analyze:
+            mock_analyze.side_effect = [
+                RefinementRecommendation(
+                    action=RefinementAction.ADD_CONTENT,
+                    priority="medium",
+                    reasoning="Need resources",
+                    estimated_impact="Medium"
+                ),
+                RefinementRecommendation(
+                    action=RefinementAction.ADD_EXAMPLES,
+                    priority="medium",
+                    reasoning="Need tasks",
+                    estimated_impact="Medium"
+                )
+            ]
             
-            mock_curate.return_value = ([], {"success": True, "count": 0})
-            mock_generate.return_value = ([], {"success": True, "count": 0})
-            
-            results = engine.batch_apply_refinements(units, feedback_list)
-            
-            assert len(results) == 2
-            assert all(r.success for r in results)
-            assert results[0].unit_id == "unit-1"
-            assert results[1].unit_id == "unit-2"
-
-    def test_action_execution_mapping(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
-        """Test that action types are correctly mapped to execution methods."""
-        engine = UnitRefinementEngine(mock_openai_client)
-        
-        # Test different action types
-        action_types = [
-            "add_resources",
-            "add_tasks", 
-            "clarify_content",
-            "reduce_difficulty",
-            "increase_difficulty",
-            "general_review"
-        ]
-        
-        for action_type in action_types:
-            action = RefinementAction(
-                action_type=action_type,
-                target_component="test",
-                description=f"Test {action_type}",
-                priority=3,
-                details={}
-            )
-            
-            processed_feedback = ProcessedFeedback(
-                unit_id="unit-1",
-                original_feedback=Mock(),
-                categories=[FeedbackCategory.GENERAL],
-                sentiment="neutral",
-                refinement_actions=[action],
-                summary=f"Test {action_type}"
-            )
-            
-            # Mock all possible agent calls
             with patch.object(engine.resource_curator, 'curate_resources') as mock_curate, \
-                 patch.object(engine.task_generator, 'generate_tasks') as mock_generate, \
-                 patch.object(engine.content_generator, 'generate_complete_content') as mock_content:
+                 patch.object(engine.task_generator, 'generate_tasks') as mock_generate:
                 
                 mock_curate.return_value = ([], {"success": True, "count": 0})
                 mock_generate.return_value = ([], {"success": True, "count": 0})
                 
-                from flowgenius.agents.content_generator import GeneratedContent
-                # Create a proper GeneratedContent object
-                generated_content = GeneratedContent(
-                    unit_id="unit-1",
-                    resources=[],
-                    engage_tasks=[],
-                    formatted_resources=[],
-                    formatted_tasks=[],
-                    generation_success=True,
-                    generation_notes=["Action test"]
-                )
-                mock_content.return_value = generated_content
+                results = engine.batch_apply_refinements(units, feedback_list)
                 
-                result = engine.apply_refinement(sample_learning_unit, processed_feedback)
-                
-                # Each action type should execute without error
-                assert result.success is True
-                assert len(result.changes_made) == 1
+                assert len(results) == 2
+                assert all(r.success for r in results)
+                assert results[0].unit_id == "unit-1"
+                assert results[1].unit_id == "unit-2"
 
 
 class TestFactoryFunction:
@@ -484,77 +373,37 @@ class TestUnitRefinementEngineIntegration:
         """Test complete refinement workflow with real-world scenario."""
         engine = UnitRefinementEngine(mock_openai_client)
         
-        # Create realistic feedback scenario
-        actions = [
-            RefinementAction(
-                action_type="add_resources",
-                target_component="resources",
-                description="Add beginner tutorials",
-                priority=4,
-                details={"types": ["video", "article"], "difficulty": "beginner"}
-            ),
-            RefinementAction(
-                action_type="add_tasks",
-                target_component="engage_tasks",
-                description="Add practice exercises",
-                priority=4,
-                details={"count": 2, "difficulty": "beginner"}
-            ),
-            RefinementAction(
-                action_type="clarify_content",
-                target_component="description",
-                description="Simplify explanations",
-                priority=3
-            )
-        ]
-        
-        processed_feedback = ProcessedFeedback(
+        # Create realistic feedback
+        feedback = UserFeedback(
             unit_id="unit-1",
-            original_feedback=Mock(),
-            categories=[FeedbackCategory.RESOURCES, FeedbackCategory.TASKS, FeedbackCategory.CONTENT],
-            sentiment="constructive",
-            refinement_actions=actions,
-            summary="User needs more beginner-friendly content and practice"
+            feedback_text="This unit needs beginner-friendly video tutorials and practice exercises",
+            timestamp="2024-01-01T10:00:00"
         )
         
-        # Mock all agent responses
-        with patch.object(engine.resource_curator, 'curate_resources') as mock_curate, \
-             patch.object(engine.task_generator, 'generate_tasks') as mock_generate, \
-             patch.object(engine.content_generator, 'generate_complete_content') as mock_content:
-            
-            mock_curate.return_value = ([LearningResource(title="New Resource", url="http://example.com", type="video")], {"success": True, "count": 1})
-            mock_generate.return_value = ([EngageTask(title="New Task", description="Do it", type="practice")], {"success": True, "count": 1})
-            
-            # Mock OpenAI for content clarification
-            from flowgenius.agents.content_generator import GeneratedContent
-            # Create a proper GeneratedContent object
-            generated_content = GeneratedContent(
-                unit_id="unit-1",
-                resources=[],
-                engage_tasks=[],
-                formatted_resources=[],
-                formatted_tasks=[],
-                generation_success=True,
-                generation_notes=["Content clarified successfully"]
+        # Mock the feedback processor to return a realistic recommendation
+        with patch.object(engine.feedback_processor, 'analyze_feedback') as mock_analyze:
+            mock_analyze.return_value = RefinementRecommendation(
+                action=RefinementAction.ADD_CONTENT,
+                priority="high",
+                specific_changes=["Add beginner video tutorials", "Include practice exercises"],
+                reasoning="User needs visual learning materials and hands-on practice",
+                estimated_impact="High - Will significantly improve learning experience"
             )
-            mock_content.return_value = generated_content
             
-            result = engine.apply_refinement(sample_learning_unit, processed_feedback)
-            
-            # Verify comprehensive refinement
-            assert result.success is True
-            assert len(result.changes_made) == 3
-            assert "Added 1 new resources" in result.changes_made[0]
-            assert "Added 1 new engage task" in result.changes_made[1]
-            assert "Updated content" in result.changes_made[2]
-            
-            # Verify components were updated
-            expected_components = ["resources", "engage_tasks", "content"]
-            for component in expected_components:
-                assert component in result.updated_components
-            
-            # Verify unit was actually modified - the current implementation adds a prefix
-            assert "[Clarified]" in result.refined_unit.description
-            assert len(result.refined_unit.resources) == len(sample_learning_unit.resources) + 1
-            assert len(result.refined_unit.engage_tasks) == len(sample_learning_unit.engage_tasks) + 1
-            assert sample_learning_unit.description != result.refined_unit.description 
+            # Mock sub-agent responses
+            with patch.object(engine.resource_curator, 'curate_resources') as mock_curate:
+                mock_curate.return_value = (
+                    [
+                        LearningResource(title="Beginner Tutorial", url="http://example.com/tutorial", type="video"),
+                        LearningResource(title="Practice Guide", url="http://example.com/guide", type="article")
+                    ],
+                    {"success": True, "count": 2}
+                )
+                
+                result = engine.apply_refinement(sample_learning_unit, feedback)
+                
+                assert result.success is True
+                assert len(result.changes_made) > 0
+                assert "resources" in result.updated_components
+                assert len(result.refined_unit.resources) > len(sample_learning_unit.resources)
+                assert "visual learning materials" in result.reasoning 

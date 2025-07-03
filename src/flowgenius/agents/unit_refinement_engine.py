@@ -2,7 +2,7 @@
 FlowGenius Unit Refinement Engine
 
 This module contains the core AI agent for iterative unit refinement
-based on user feedback and content generation.
+based on user feedback and content generation using LangChain orchestration.
 """
 
 import logging
@@ -11,11 +11,12 @@ from typing import List, Optional, Dict, Any, Tuple
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
-from ..models.project import LearningUnit, LearningResource, EngageTask
+from ..models.project import LearningUnit, LearningResource, EngageTask, UserFeedback
 from ..models.settings import DefaultSettings
 from .content_generator import ContentGeneratorAgent, ContentGenerationRequest
 from .resource_curator import ResourceCuratorAgent, ResourceRequest
 from .engage_task_generator import EngageTaskGeneratorAgent, TaskGenerationRequest
+from .feedback_processor import FeedbackProcessor, RefinementRecommendation, RefinementAction
 from ..utils import get_timestamp
 
 # Set up module logger
@@ -48,13 +49,13 @@ class UnitRefinementEngine:
     """
     Core engine for iterative unit refinement based on user feedback.
     
-    This agent processes user feedback and refines learning units to better
-    meet learner needs and objectives.
+    This agent processes user feedback using LangChain and refines learning units 
+    to better meet learner needs and objectives.
     """
     
     def __init__(self, openai_client: OpenAI, model: str = DefaultSettings.DEFAULT_MODEL) -> None:
         """
-        Initialize the refinement engine with OpenAI client.
+        Initialize the refinement engine with OpenAI client and LangChain components.
         
         Args:
             openai_client: Configured OpenAI client
@@ -64,25 +65,33 @@ class UnitRefinementEngine:
         self.model = model
         self.refinement_history: List[Dict[str, Any]] = []
         
+        # Initialize sub-agents
         self.content_generator = ContentGeneratorAgent(self.client, self.model)
         self.resource_curator = ResourceCuratorAgent(self.client, self.model)
         self.task_generator = EngageTaskGeneratorAgent(self.client, self.model)
-
-    def apply_refinement(self, unit: LearningUnit, processed_feedback) -> 'RefinementResult':
-        """
-        Apply refinement actions to a learning unit based on processed feedback.
         
-        This is the primary method for modifying a learning unit. It orchestrates
-        calls to various sub-agents based on the requested refinement actions.
+        # Initialize LangChain-based feedback processor
+        self.feedback_processor = FeedbackProcessor(self.model)
+
+    def apply_refinement(self, unit: LearningUnit, feedback: UserFeedback) -> 'RefinementResult':
+        """
+        Apply refinement to a learning unit based on user feedback using LangChain.
+        
+        This method uses the FeedbackProcessor to analyze feedback and generate
+        refinement recommendations, then orchestrates sub-agents to apply changes.
         
         Args:
             unit: LearningUnit to refine
-            processed_feedback: ProcessedFeedback object with refinement actions
+            feedback: UserFeedback object to process
             
         Returns:
             RefinementResult with the refined unit and metadata
         """
-        logger.info(f"Applying refinement to unit {unit.id} with {len(processed_feedback.refinement_actions)} actions")
+        logger.info(f"Applying refinement to unit {unit.id} based on feedback")
+        
+        # Use LangChain to analyze feedback and get recommendation
+        recommendation = self.feedback_processor.analyze_feedback(feedback, unit)
+        logger.info(f"LangChain recommendation: {recommendation.action} with priority {recommendation.priority}")
         
         refined_unit = unit.model_copy(deep=True)
         changes_made: List[str] = []
@@ -90,50 +99,74 @@ class UnitRefinementEngine:
         agent_responses: Dict[str, Any] = {}
         errors: List[str] = []
 
-        for action in processed_feedback.refinement_actions:
-            try:
-                if action.action_type == "add_resources":
-                    new_resources, agent_response = self._add_resources_to_unit(refined_unit, action)
-                    agent_responses["add_resources"] = agent_response
-                    if agent_response.get("success"):
-                        refined_unit.resources.extend(new_resources)
-                        changes_made.append(f"Added {len(new_resources)} new resources.")
-                        updated_components.append("resources")
-                    else:
-                        errors.append(f"Failed to add resources: {agent_response.get('error', 'Unknown error')}")
+        try:
+            # Map LangChain recommendation to refinement actions
+            if recommendation.action == RefinementAction.ADD_CONTENT:
+                # Add resources based on the recommendation
+                new_resources, agent_response = self._add_resources_to_unit(
+                    refined_unit, 
+                    recommendation
+                )
+                agent_responses["add_resources"] = agent_response
+                if agent_response.get("success"):
+                    refined_unit.resources.extend(new_resources)
+                    changes_made.append(f"Added {len(new_resources)} new resources based on feedback.")
+                    updated_components.append("resources")
+                else:
+                    errors.append(f"Failed to add resources: {agent_response.get('error', 'Unknown error')}")
 
-                elif action.action_type == "add_tasks":
-                    new_tasks, agent_response = self._add_tasks_to_unit(refined_unit, action)
-                    agent_responses["add_tasks"] = agent_response
-                    if agent_response.get("success"):
-                        refined_unit.engage_tasks.extend(new_tasks)
-                        task_word = "task" if len(new_tasks) == 1 else "tasks"
-                        changes_made.append(f"Added {len(new_tasks)} new engage {task_word}.")
-                        updated_components.append("engage_tasks")
-                    else:
-                        errors.append(f"Failed to add tasks: {agent_response.get('error', 'Unknown error')}")
+            elif recommendation.action == RefinementAction.ADD_EXAMPLES:
+                # Add engage tasks as examples
+                new_tasks, agent_response = self._add_tasks_to_unit(
+                    refined_unit, 
+                    recommendation
+                )
+                agent_responses["add_tasks"] = agent_response
+                if agent_response.get("success"):
+                    refined_unit.engage_tasks.extend(new_tasks)
+                    task_word = "task" if len(new_tasks) == 1 else "tasks"
+                    changes_made.append(f"Added {len(new_tasks)} new engage {task_word} as examples.")
+                    updated_components.append("engage_tasks")
+                else:
+                    errors.append(f"Failed to add tasks: {agent_response.get('error', 'Unknown error')}")
                     
-                elif action.action_type in ["clarify_content", "reduce_difficulty", "increase_difficulty", "general_review"]:
-                    refined_content, agent_response = self._update_unit_content(refined_unit, action)
-                    agent_responses[action.action_type] = agent_response
-                    if agent_response.get("success"):
-                        refined_unit.title = refined_content.get("title", refined_unit.title)
-                        refined_unit.description = refined_content.get("description", refined_unit.description)
-                        changes_made.append(f"Updated content based on '{action.action_type}' feedback.")
-                        updated_components.append("content")
-                    else:
-                        errors.append(f"Failed to update content: {agent_response.get('error', 'Unknown error')}")
+            elif recommendation.action in [RefinementAction.CLARIFY_CONTENT, 
+                                         RefinementAction.SIMPLIFY_CONTENT,
+                                         RefinementAction.EXPAND_CONTENT]:
+                # Update content based on recommendation
+                refined_content, agent_response = self._update_unit_content(
+                    refined_unit, 
+                    recommendation
+                )
+                agent_responses[recommendation.action.value] = agent_response
+                if agent_response.get("success"):
+                    refined_unit.title = refined_content.get("title", refined_unit.title)
+                    refined_unit.description = refined_content.get("description", refined_unit.description)
+                    changes_made.append(f"Updated content: {recommendation.reasoning}")
+                    updated_components.append("content")
+                else:
+                    errors.append(f"Failed to update content: {agent_response.get('error', 'Unknown error')}")
+                    
+            elif recommendation.action == RefinementAction.NO_ACTION:
+                changes_made.append("No changes needed based on feedback analysis.")
+                
+            else:
+                # For other actions, log but don't fail
+                logger.warning(f"Unhandled refinement action: {recommendation.action}")
+                changes_made.append(f"Acknowledged feedback: {recommendation.reasoning}")
 
-            except (ValueError, TypeError, AttributeError) as e:
-                error_msg = f"Error applying action '{action.action_type}': {str(e)}"
-                errors.append(error_msg)
-                logger.error(error_msg, exc_info=True)
+        except Exception as e:
+            error_msg = f"Error applying refinement: {str(e)}"
+            errors.append(error_msg)
+            logger.error(error_msg, exc_info=True)
 
-        success = not errors
-        reasoning = f"Applied {len(changes_made)} changes with {len(errors)} errors."
+        success = len(errors) == 0
+        reasoning = recommendation.reasoning
+        if errors:
+            reasoning += f" However, encountered {len(errors)} errors during execution."
 
         # Record the refinement attempt in history
-        self._record_refinement(unit, processed_feedback.summary, changes_made, reasoning)
+        self._record_refinement(unit, feedback.feedback_text, changes_made, reasoning)
 
         return RefinementResult(
             unit_id=unit.id,
@@ -174,45 +207,49 @@ class UnitRefinementEngine:
         self.refinement_history.clear()
         logger.info("Cleared refinement history")
     
-    def _add_resources_to_unit(self, unit: LearningUnit, action) -> Tuple[List[LearningResource], Dict[str, Any]]:
-        """Add resources to unit using resource curator."""
+    def _add_resources_to_unit(self, unit: LearningUnit, recommendation: RefinementRecommendation) -> Tuple[List[LearningResource], Dict[str, Any]]:
+        """Add resources to unit using resource curator based on LangChain recommendation."""
         try:
+            # Determine resource count from recommendation
+            count = 2  # Default
+            if "video" in " ".join(recommendation.specific_changes).lower():
+                count = 3  # More if specifically requesting videos
+                
             request = ResourceRequest(
                 unit=unit,
-                min_video_resources=action.details.get("count", 1),
-                min_reading_resources=action.details.get("count", 1),
-                max_total_resources=action.details.get("count", 2)
+                min_video_resources=1,
+                min_reading_resources=1,
+                max_total_resources=count
             )
             resources, success = self.resource_curator.curate_resources(request)
             return resources, {"success": success, "count": len(resources)}
-        except (ValueError, AttributeError) as e:
+        except Exception as e:
             logger.error(f"Failed to add resources: {e}", exc_info=True)
             return [], {"success": False, "error": str(e)}
     
-    def _add_tasks_to_unit(self, unit: LearningUnit, action) -> Tuple[List[EngageTask], Dict[str, Any]]:
-        """Add tasks to unit using task generator."""
+    def _add_tasks_to_unit(self, unit: LearningUnit, recommendation: RefinementRecommendation) -> Tuple[List[EngageTask], Dict[str, Any]]:
+        """Add tasks to unit using task generator based on LangChain recommendation."""
         try:
-            num_tasks = action.details.get("count", 1)
-            
-            # Create a proper request
+            # Determine task count and type from recommendation
+            num_tasks = 2  # Default
+            if "practice" in " ".join(recommendation.specific_changes).lower():
+                num_tasks = 3
+                
             request = TaskGenerationRequest(
                 unit=unit,
                 resources=unit.resources,
                 num_tasks=num_tasks,
-                difficulty_preference=action.details.get("difficulty", None),
                 focus_on_application=True
             )
             
-            # Generate tasks
             tasks, success = self.task_generator.generate_tasks(request)
-            
             return tasks, {"success": success, "count": len(tasks)}
-        except (ValueError, AttributeError) as e:
+        except Exception as e:
             logger.error(f"Failed to add tasks: {e}", exc_info=True)
             return [], {"success": False, "error": str(e)}
     
-    def _update_unit_content(self, unit: LearningUnit, action) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        """Update unit content using the ContentGeneratorAgent."""
+    def _update_unit_content(self, unit: LearningUnit, recommendation: RefinementRecommendation) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Update unit content using the ContentGeneratorAgent based on LangChain recommendation."""
         try:
             # Create a request with the full unit
             request = ContentGenerationRequest(
@@ -220,46 +257,46 @@ class UnitRefinementEngine:
                 min_video_resources=1,
                 min_reading_resources=1,
                 max_total_resources=5,
-                num_engage_tasks=1,
-                difficulty_preference=action.details.get("difficulty", None)
+                num_engage_tasks=1
             )
             
             # Generate new content
             generated_content = self.content_generator.generate_complete_content(request)
             
             if generated_content.generation_success:
-                # For content updates, we only want to update the description (and possibly title)
-                # based on the action type
+                # Apply specific updates based on recommendation
                 refined_content = {
-                    "title": unit.title,  # Keep original title unless specifically changed
-                    "description": unit.description  # Will be updated based on feedback
+                    "title": unit.title,  # Keep original title
+                    "description": unit.description  # Will be updated
                 }
                 
                 # Apply specific updates based on action type
-                if action.action_type == "reduce_difficulty":
-                    refined_content["description"] = f"[Simplified for beginners] {unit.description}"
-                elif action.action_type == "increase_difficulty":
-                    refined_content["description"] = f"[Advanced level] {unit.description}"
-                elif action.action_type == "clarify_content":
+                if recommendation.action == RefinementAction.SIMPLIFY_CONTENT:
+                    refined_content["description"] = f"[Simplified] {unit.description}"
+                elif recommendation.action == RefinementAction.CLARIFY_CONTENT:
                     refined_content["description"] = f"[Clarified] {unit.description}"
+                elif recommendation.action == RefinementAction.EXPAND_CONTENT:
+                    refined_content["description"] = f"[Expanded] {unit.description}"
                 
                 return refined_content, {"success": True, "result": refined_content}
             else:
                 return {}, {"success": False, "error": "Content generation failed."}
-        except (ValueError, AttributeError) as e:
-            logger.error(f"Failed to update content via ContentGeneratorAgent: {e}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Failed to update content: {e}", exc_info=True)
             return {}, {"success": False, "error": str(e)}
 
-    def batch_apply_refinements(self, units: List[LearningUnit], feedback_list: List) -> List[RefinementResult]:
+    def batch_apply_refinements(self, units: List[LearningUnit], feedbacks: List[UserFeedback]) -> List[RefinementResult]:
         """
         Apply refinements to multiple units with their corresponding feedback.
+        
+        Uses LangChain to process each feedback and apply appropriate refinements.
         """
         results = []
-        for unit, feedback in zip(units, feedback_list):
+        for unit, feedback in zip(units, feedbacks):
             try:
                 result = self.apply_refinement(unit, feedback)
                 results.append(result)
-            except (ValueError, TypeError) as e:
+            except Exception as e:
                 logger.error(f"Failed to apply refinement to unit {unit.id}: {e}", exc_info=True)
                 error_result = RefinementResult(
                     unit_id=unit.id,

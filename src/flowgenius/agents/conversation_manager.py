@@ -2,18 +2,19 @@
 FlowGenius Conversation Manager
 
 This module provides conversation management for handling user feedback
-during the unit refinement process.
+during the unit refinement process using LangChain for memory management.
 """
 
 from typing import Dict, List, Optional, Any, Tuple, Callable
 import uuid
 import logging
 import re
+import os
 
-try:
-    from openai import OpenAI
-except ImportError:
-    OpenAI = None
+from langchain.memory import ConversationBufferMemory
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_openai import ChatOpenAI
 
 from ..models.project import LearningUnit, UserFeedback
 from ..utils import get_timestamp
@@ -22,11 +23,11 @@ logger = logging.getLogger(__name__)
 
 
 class ConversationSession:
-    """Represents an active conversation session."""
+    """Represents an active conversation session with LangChain memory."""
     
     def __init__(self, session_id: str, unit_id: str, unit: LearningUnit) -> None:
         """
-        Initialize a conversation session.
+        Initialize a conversation session with LangChain memory.
         
         Args:
             session_id: Unique session identifier
@@ -38,33 +39,59 @@ class ConversationSession:
         self.unit = unit
         self.created_at = get_timestamp()
         self.feedback_history: List[UserFeedback] = []
+        
+        # Initialize LangChain ConversationBufferMemory
+        self.memory = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True,
+            output_key="output"
+        )
 
 
 class ConversationManager:
     """
-    Manages conversation sessions with learners.
+    Manages conversation sessions with learners using LangChain.
     
     This class handles the creation and management of refinement sessions,
-    processes user feedback, and generates appropriate responses.
+    processes user feedback using LangChain memory, and generates appropriate responses.
     """
     
     def __init__(self, openai_client=None, model: str = "gpt-4o-mini", timestamp_provider: Optional[Callable[[], str]] = None) -> None:
         """
-        Initialize the conversation manager.
+        Initialize the conversation manager with LangChain components.
         
         Args:
-            openai_client: OpenAI client (kept for backward compatibility)
-            model: Model name (kept for backward compatibility)
+            openai_client: OpenAI client for LLM operations (deprecated, use api_key instead)
+            model: Model name for chat completions
             timestamp_provider: Optional function to provide timestamps.
                 Defaults to utils.get_timestamp().
         """
-        self.client = openai_client  # Keep for backward compatibility
-        self.model = model  # Keep for backward compatibility
-        self.system_prompt = """You are an AI learning assistant helping users refine and improve their learning units. 
-        You analyze feedback, ask clarifying questions, and help users articulate specific improvements they want to make. 
-        Focus on understanding user needs and converting feedback into actionable refinement suggestions."""
-        self.active_sessions: Dict[str, Dict[str, Any]] = {}
+        # For LangChain, we'll use ChatOpenAI directly
+        self.chat_model = None
+        if openai_client and hasattr(openai_client, 'api_key'):
+            # Extract API key from OpenAI client if provided
+            os.environ["OPENAI_API_KEY"] = openai_client.api_key
+            self.chat_model = ChatOpenAI(model=model, temperature=0.7)
+        elif "OPENAI_API_KEY" in os.environ:
+            self.chat_model = ChatOpenAI(model=model, temperature=0.7)
+            
+        self.model = model
         self._timestamp_provider = timestamp_provider or get_timestamp
+        self.active_sessions: Dict[str, ConversationSession] = {}
+        
+        # System prompt for the conversation
+        self.system_message = SystemMessage(
+            content="""You are an AI learning assistant helping users refine and improve their learning units. 
+            You analyze feedback, ask clarifying questions, and help users articulate specific improvements they want to make. 
+            Focus on understanding user needs and converting feedback into actionable refinement suggestions."""
+        )
+        
+        # Create the prompt template with memory placeholder
+        self.prompt_template = ChatPromptTemplate.from_messages([
+            self.system_message,
+            MessagesPlaceholder(variable_name="chat_history"),
+            HumanMessage(content="{input}")
+        ])
     
     def start_refinement_session(self, unit: LearningUnit) -> str:
         """
@@ -79,20 +106,16 @@ class ConversationManager:
         session_uuid = uuid.uuid4().hex
         session_id = f"refine_{unit.id}_{session_uuid}"
         
-        # Store session information for later retrieval
-        self.active_sessions[session_id] = {
-            "unit_id": unit.id,
-            "unit": unit,
-            "created_at": self._timestamp_provider(),
-            "feedback_history": []
-        }
+        # Create a new session with LangChain memory
+        session = ConversationSession(session_id, unit.id, unit)
+        self.active_sessions[session_id] = session
         
         logger.info(f"Started refinement session {session_id} for unit {unit.id}")
         return session_id
     
     def process_user_feedback(self, session_id: str, feedback_text: str) -> Tuple[str, UserFeedback]:
         """
-        Process user feedback from a session.
+        Process user feedback from a session using LangChain memory.
         
         Args:
             session_id: Session identifier
@@ -101,29 +124,148 @@ class ConversationManager:
         Returns:
             Tuple of (response_string, UserFeedback_object)
         """
-        # Extract unit_id from session_id
-        unit_id = self._extract_unit_id_from_session(session_id)
+        # Get the session
+        session = self.active_sessions.get(session_id)
+        if not session:
+            # Create a minimal session if it doesn't exist
+            unit_id = self._extract_unit_id_from_session(session_id)
+            response = "Session not found. Please start a new refinement session."
+            feedback = UserFeedback(
+                unit_id=unit_id,
+                feedback_text=feedback_text,
+                feedback_type="general",
+                specific_concerns=[],
+                suggestions=[],
+                suggested_changes=[],
+                priority="medium",
+                timestamp=self._timestamp_provider()
+            )
+            return response, feedback
         
         # Create structured feedback
         feedback = UserFeedback(
-            unit_id=unit_id,
+            unit_id=session.unit_id,
             feedback_text=feedback_text,
             feedback_type="general",
-            specific_concerns=[],
-            suggestions=[],
+            specific_concerns=self._extract_concerns(feedback_text),
+            suggestions=self._extract_suggestions(feedback_text),
             suggested_changes=[],
             priority="medium",
             timestamp=self._timestamp_provider()
         )
         
-        # Generate response
-        response = self._generate_response(feedback)
+        # Generate response using LangChain
+        response = self._generate_langchain_response(session, feedback_text)
         
         # Store feedback in session history
-        if session_id in self.active_sessions:
-            self.active_sessions[session_id]["feedback_history"].append(feedback)
+        session.feedback_history.append(feedback)
+        
+        # Update LangChain memory
+        session.memory.save_context(
+            {"input": feedback_text},
+            {"output": response}
+        )
         
         return response, feedback
+    
+    def _generate_langchain_response(self, session: ConversationSession, input_text: str) -> str:
+        """
+        Generate a response using LangChain with conversation memory.
+        
+        Args:
+            session: The conversation session
+            input_text: User input text
+            
+        Returns:
+            AI response string
+        """
+        if not self.chat_model:
+            # Fallback response if no chat model configured
+            return self._generate_fallback_response(input_text)
+        
+        try:
+            # Get conversation history from memory
+            memory_variables = session.memory.load_memory_variables({})
+            chat_history = memory_variables.get("chat_history", [])
+            
+            # Create a simple chain with the chat model
+            chain = self.prompt_template | self.chat_model
+            
+            # Invoke the chain with the input and chat history
+            response = chain.invoke({
+                "chat_history": chat_history,
+                "input": input_text
+            })
+            
+            # Extract content from the response
+            if hasattr(response, 'content'):
+                return response.content.strip()
+            else:
+                return str(response).strip()
+                
+        except Exception as e:
+            logger.error(f"Error generating LangChain response: {e}", exc_info=True)
+            return self._generate_fallback_response(input_text)
+    
+    def _generate_fallback_response(self, feedback_text: str) -> str:
+        """
+        Generate a fallback response without LLM.
+        
+        Args:
+            feedback_text: User feedback text
+            
+        Returns:
+            Fallback response string
+        """
+        # Analyze feedback sentiment
+        sentiment = self._analyze_sentiment(feedback_text)
+        
+        # Generate appropriate response based on sentiment and content
+        if sentiment == "positive":
+            response = "I understand your feedback. Thank you for your positive input! "
+        elif sentiment == "negative":
+            response = "I understand your feedback about your concerns. "
+        else:
+            response = "I understand your feedback. "
+        
+        # Add specific acknowledgment
+        concerns = self._extract_concerns(feedback_text)
+        suggestions = self._extract_suggestions(feedback_text)
+        
+        if concerns:
+            response += f"I've noted your concerns about: {', '.join(concerns)}. "
+        
+        if suggestions:
+            response += f"Your suggestions about {', '.join(suggestions)} are valuable. "
+        
+        response += "I'll work on refining the unit based on your input."
+        
+        return response
+    
+    def _extract_concerns(self, text: str) -> List[str]:
+        """Extract specific concerns from feedback text."""
+        concerns = []
+        concern_keywords = ["concern", "problem", "issue", "difficult", "confusing", "unclear"]
+        
+        text_lower = text.lower()
+        for keyword in concern_keywords:
+            if keyword in text_lower:
+                # Simple extraction - in real implementation, use NLP
+                concerns.append(keyword)
+        
+        return concerns[:3]  # Limit to 3 concerns
+    
+    def _extract_suggestions(self, text: str) -> List[str]:
+        """Extract suggestions from feedback text."""
+        suggestions = []
+        suggestion_keywords = ["suggest", "recommend", "should", "could", "would be better", "improve"]
+        
+        text_lower = text.lower()
+        for keyword in suggestion_keywords:
+            if keyword in text_lower:
+                suggestions.append(keyword)
+        
+        return suggestions[:3]  # Limit to 3 suggestions
     
     def _extract_unit_id_from_session(self, session_id: str) -> str:
         """
@@ -156,38 +298,6 @@ class ConversationManager:
             return "unknown-unit"
         except (AttributeError, TypeError, ValueError):
             return "unknown-unit"
-    
-    def _generate_response(self, feedback: UserFeedback) -> str:
-        """
-        Generate a response to user feedback.
-        
-        Args:
-            feedback: Structured user feedback
-            
-        Returns:
-            Response string
-        """
-        # Analyze feedback sentiment
-        sentiment = self._analyze_sentiment(feedback.feedback_text)
-        
-        # Generate appropriate response based on sentiment and content
-        if sentiment == "positive":
-            response = "I understand your feedback. Thank you for your positive input! "
-        elif sentiment == "negative":
-            response = "I understand your feedback about your concerns. "
-        else:
-            response = "I understand your feedback. "
-        
-        # Add specific acknowledgment
-        if feedback.specific_concerns:
-            response += f"I've noted your concerns about: {', '.join(feedback.specific_concerns)}. "
-        
-        if feedback.suggestions:
-            response += f"Your suggestions about {', '.join(feedback.suggestions)} are valuable. "
-        
-        response += "I'll work on refining the unit based on your input."
-        
-        return response
     
     def _analyze_sentiment(self, text: str) -> str:
         """
@@ -223,7 +333,19 @@ class ConversationManager:
         Returns:
             Session information dictionary or None if not found
         """
-        return self.active_sessions.get(session_id)
+        session = self.active_sessions.get(session_id)
+        if not session:
+            return None
+        
+        # Return session info including memory state
+        memory_vars = session.memory.load_memory_variables({})
+        return {
+            "session_id": session.session_id,
+            "unit_id": session.unit_id,
+            "created_at": session.created_at,
+            "feedback_count": len(session.feedback_history),
+            "memory_messages": len(memory_vars.get("chat_history", []))
+        }
     
     def end_session(self, session_id: str) -> bool:
         """
@@ -236,6 +358,10 @@ class ConversationManager:
             True if session was ended, False if not found
         """
         if session_id in self.active_sessions:
+            # Clear memory before deletion
+            session = self.active_sessions[session_id]
+            session.memory.clear()
+            
             del self.active_sessions[session_id]
             logger.info(f"Ended session {session_id}")
             return True
@@ -244,30 +370,25 @@ class ConversationManager:
 
 def create_conversation_manager(api_key: Optional[str] = None, model: str = "gpt-4o-mini") -> ConversationManager:
     """
-    Factory function to create a ConversationManager with OpenAI client.
+    Factory function to create a ConversationManager with LangChain.
     
     Args:
-        api_key: OpenAI API key (optional)
-        model: OpenAI model to use
+        api_key: Optional OpenAI API key. If not provided, will use environment variable.
+        model: Model name for the chat model
         
     Returns:
-        Configured ConversationManager instance
+        ConversationManager instance
         
     Raises:
-        RuntimeError: If OpenAI client creation fails
+        RuntimeError: If ConversationManager creation fails
     """
     try:
-        if OpenAI is None:
-            raise ImportError("OpenAI package not installed")
-        
         if api_key:
-            client = OpenAI(api_key=api_key)
-        else:
-            client = OpenAI()  # Will use environment variable
-            
-        return ConversationManager(client, model=model)
-    except ImportError as e:
-        raise RuntimeError(f"Failed to create ConversationManager: OpenAI package not installed") from e
+            os.environ["OPENAI_API_KEY"] = api_key
+        elif "OPENAI_API_KEY" not in os.environ:
+            raise RuntimeError("OpenAI API key not provided and OPENAI_API_KEY environment variable not set")
+        
+        return ConversationManager(openai_client=None, model=model)
     except Exception as e:
         logger.error(f"Failed to create ConversationManager: {e}", exc_info=True)
         raise RuntimeError(f"Failed to create ConversationManager: {e}") from e
