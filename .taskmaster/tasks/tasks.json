@@ -556,9 +556,9 @@
             "id": 12,
             "title": "Replace time.sleep in tests with deterministic sync",
             "description": "Use events/mocks instead of sleeps for concurrency tests to avoid flaky behaviour.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
-            "details": "Address `time.sleep()` in `test_progress_tracking_comprehensive.py` lines 867, 1108.",
+            "details": "Address `time.sleep()` in `test_progress_tracking_comprehensive.py` lines 867, 1108.\n<info added on 2025-07-03T22:31:55.117Z>\nCompleted replacing time.sleep with deterministic synchronization:\n- Created tests/test_utils.py with synchronization helpers (ThreadSynchronizer, run_concurrent_operations, OrderedExecutor)\n- Updated test_concurrent_unit_updates to use run_concurrent_operations instead of time.sleep(0.01)\n- Updated test_concurrent_cli_operations to use run_concurrent_operations instead of time.sleep(0.01)\n- All tests pass (46 tests in test_progress_tracking_comprehensive.py)\n- Tests now use threading primitives (Barrier, Event) for deterministic synchronization\n- This ensures tests are faster and more reliable without arbitrary delays\n</info added on 2025-07-03T22:31:55.117Z>",
             "testStrategy": ""
           },
           {
@@ -611,7 +611,7 @@
     ],
     "metadata": {
       "created": "2025-07-01T17:03:10.935Z",
-      "updated": "2025-07-03T22:23:59.758Z",
+      "updated": "2025-07-03T22:33:01.343Z",
       "description": "Tasks for master context"
     }
   }

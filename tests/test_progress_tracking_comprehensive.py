@@ -862,25 +862,19 @@ class TestEndToEndWorkflows:
             # IMPORTANT: Initialize the state store with the project units
             store.initialize_from_project(project)
             
-            # Multiple rapid updates
+            # Multiple rapid updates with deterministic synchronization
             import threading
-            import time
+            from tests.test_utils import run_concurrent_operations
             
-            def update_unit(unit_id, status):
-                time.sleep(0.01)  # Small delay to increase concurrency chance
-                store.update_unit_status(unit_id, status)
-            
-            threads = [
-                threading.Thread(target=update_unit, args=("unit-1", "in-progress")),
-                threading.Thread(target=update_unit, args=("unit-2", "completed")),
-                threading.Thread(target=update_unit, args=("unit-3", "in-progress")),
+            # Define operations to run concurrently
+            operations = [
+                lambda: store.update_unit_status("unit-1", "in-progress"),
+                lambda: store.update_unit_status("unit-2", "completed"),
+                lambda: store.update_unit_status("unit-3", "in-progress"),
             ]
             
-            for thread in threads:
-                thread.start()
-            
-            for thread in threads:
-                thread.join()
+            # Run operations with synchronization to ensure true concurrency
+            run_concurrent_operations(operations, synchronized=True)
             
             # Verify final state is consistent
             final_state = store.load_state()
@@ -1092,7 +1086,7 @@ class TestPerformanceAndScalability:
             import shutil
             import os
             import threading
-            import time
+            from tests.test_utils import run_concurrent_operations
             
             shutil.copytree(project_with_files, "test-project")
             os.chdir("test-project")
@@ -1106,28 +1100,27 @@ class TestPerformanceAndScalability:
             
             # Define concurrent operations
             results = []
+            results_lock = threading.Lock()
             
             def run_command(command_args):
-                time.sleep(0.01)  # Small stagger
                 result = runner.invoke(unit, command_args)
-                results.append((command_args, result.exit_code))
+                with results_lock:
+                    results.append((command_args, result.exit_code))
+                return result.exit_code
             
-            # Launch concurrent operations
-            threads = [
-                threading.Thread(target=run_command, args=(["start", "unit-1"],)),
-                threading.Thread(target=run_command, args=(["mark-done", "unit-2"],)),
-                threading.Thread(target=run_command, args=(["status", "--all"],)),
-                threading.Thread(target=run_command, args=(["start", "unit-3"],)),
+            # Define operations to run concurrently
+            operations = [
+                lambda: run_command(["start", "unit-1"]),
+                lambda: run_command(["mark-done", "unit-2"]),
+                lambda: run_command(["status", "--all"]),
+                lambda: run_command(["start", "unit-3"]),
             ]
             
-            for thread in threads:
-                thread.start()
-            
-            for thread in threads:
-                thread.join()
+            # Run operations with synchronization
+            exit_codes = run_concurrent_operations(operations, synchronized=True)
             
             # At least one operation should succeed (concurrent operations may have race conditions)
-            successful_operations = sum(1 for _, exit_code in results if exit_code == 0)
+            successful_operations = sum(1 for exit_code in exit_codes if exit_code == 0)
             assert successful_operations >= 1  # At least one should succeed
             
             # If all failed, print debug info for analysis
