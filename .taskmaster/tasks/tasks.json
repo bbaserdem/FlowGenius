@@ -333,8 +333,8 @@
             "dependencies": [
               3
             ],
-            "details": "Create comprehensive tests that cover all aspects of the progress tracking functionality, including edge cases and error handling. Ensure that the tests validate the integration between the State Store, CLI command, and MarkdownRenderer.",
-            "status": "pending",
+            "details": "Create comprehensive tests that cover all aspects of the progress tracking functionality, including edge cases and error handling. Ensure that the tests validate the integration between the State Store, CLI command, and MarkdownRenderer.\n<info added on 2025-07-02T22:59:04.544Z>\nStarting implementation of comprehensive progress tracking tests.\n\n**Analysis Complete - Understanding the Testing Scope:**\n\nThe progress tracking system consists of 3 main components that need comprehensive testing:\n\n1. **StateStore** (src/flowgenius/models/state_store.py):\n   - UnitState, ProjectState models\n   - StateStore class with load/save operations\n   - State initialization from projects\n   - Progress summaries and unit status updates\n\n2. **CLI Unit Commands** (src/flowgenius/cli/unit.py):\n   - mark-done command with options (--completion-date, --notes, --dry-run)\n   - status command (single unit and --all)\n   - start command\n   - Project directory detection and error handling\n\n3. **MarkdownRenderer Integration** (src/flowgenius/models/renderer.py):\n   - State-aware rendering methods\n   - sync_with_state functionality\n   - Progress tracking in markdown files\n\n**Implementation Plan:**\nCreating `test_progress_tracking_comprehensive.py` with:\n- StateStore unit tests (all methods and edge cases)\n- CLI command integration tests (using Click testing framework)\n- MarkdownRenderer state integration tests\n- End-to-end workflow tests (complete user scenarios)\n- Error handling and edge case tests\n- Performance and concurrency tests\n\n**Testing Framework:**\n- pytest for test structure\n- Click.testing.CliRunner for CLI testing\n- tempfile/tmpdir for isolated test environments\n- Mock where appropriate for external dependencies\n- Comprehensive fixtures for test data\n</info added on 2025-07-02T22:59:04.544Z>",
+            "status": "in-progress",
             "testStrategy": "Implement end-to-end tests that simulate user interactions with the CLI and verify the correct updates in both state.json and Markdown files."
           }
         ]
@@ -394,7 +394,7 @@
     ],
     "metadata": {
       "created": "2025-07-01T17:03:10.935Z",
-      "updated": "2025-07-02T22:11:58.341Z",
+      "updated": "2025-07-02T22:58:38.156Z",
       "description": "Tasks for master context"
     }
   }

@@ -10,6 +10,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Literal, Any
+import threading
 from pydantic import BaseModel, Field
 
 from .project import LearningProject, LearningUnit
@@ -96,6 +97,8 @@ class StateStore:
         self.project_dir = Path(project_dir)
         self.state_file = self.project_dir / "state.json"
         self._current_state: Optional[ProjectState] = None
+        # Use a re-entrant lock so nested method calls can safely acquire it multiple times
+        self._lock = threading.RLock()
     
     def load_state(self) -> ProjectState:
         """
@@ -107,31 +110,32 @@ class StateStore:
         Raises:
             ValueError: If state.json exists but contains invalid data
         """
-        if not self.state_file.exists():
-            # Create default state if file doesn't exist
-            return self._create_default_state()
-        
-        try:
-            with open(self.state_file, 'r') as f:
-                state_data = json.load(f)
+        with self._lock:
+            if not self.state_file.exists():
+                # Create default state if file doesn't exist
+                return self._create_default_state()
             
-            # Convert datetime strings back to datetime objects
-            if 'created_at' in state_data:
-                state_data['created_at'] = datetime.fromisoformat(state_data['created_at'])
-            if 'updated_at' in state_data:
-                state_data['updated_at'] = datetime.fromisoformat(state_data['updated_at'])
-            
-            for unit_id, unit_data in state_data.get('units', {}).items():
-                if 'started_at' in unit_data and unit_data['started_at']:
-                    unit_data['started_at'] = datetime.fromisoformat(unit_data['started_at'])
-                if 'completed_at' in unit_data and unit_data['completed_at']:
-                    unit_data['completed_at'] = datetime.fromisoformat(unit_data['completed_at'])
-            
-            self._current_state = ProjectState(**state_data)
-            return self._current_state
-            
-        except (json.JSONDecodeError, TypeError, ValueError) as e:
-            raise ValueError(f"Invalid state.json file in {self.project_dir}: {e}")
+            try:
+                with open(self.state_file, 'r') as f:
+                    state_data = json.load(f)
+                
+                # Convert datetime strings back to datetime objects
+                if 'created_at' in state_data:
+                    state_data['created_at'] = datetime.fromisoformat(state_data['created_at'])
+                if 'updated_at' in state_data:
+                    state_data['updated_at'] = datetime.fromisoformat(state_data['updated_at'])
+                
+                for unit_id, unit_data in state_data.get('units', {}).items():
+                    if 'started_at' in unit_data and unit_data['started_at']:
+                        unit_data['started_at'] = datetime.fromisoformat(unit_data['started_at'])
+                    if 'completed_at' in unit_data and unit_data['completed_at']:
+                        unit_data['completed_at'] = datetime.fromisoformat(unit_data['completed_at'])
+                
+                self._current_state = ProjectState(**state_data)
+                return self._current_state
+                
+            except (json.JSONDecodeError, TypeError, ValueError) as e:
+                raise ValueError(f"Invalid state.json file in {self.project_dir}: {e}")
     
     def save_state(self, state: Optional[ProjectState] = None) -> None:
         """
@@ -143,35 +147,36 @@ class StateStore:
         Raises:
             OSError: If unable to write to state.json file
         """
-        if state is None:
-            state = self._current_state or self.load_state()
-        
-        # Ensure project directory exists
-        self.project_dir.mkdir(parents=True, exist_ok=True)
-        
-        try:
-            # Convert to dict with datetime serialization
-            state_dict = state.model_dump()
+        with self._lock:
+            if state is None:
+                state = self._current_state or self.load_state()
             
-            # Convert datetime objects to ISO format strings
-            if state_dict.get('created_at'):
-                state_dict['created_at'] = state.created_at.isoformat()
-            if state_dict.get('updated_at'):
-                state_dict['updated_at'] = state.updated_at.isoformat()
+            # Ensure project directory exists
+            self.project_dir.mkdir(parents=True, exist_ok=True)
             
-            for unit_id, unit_data in state_dict.get('units', {}).items():
-                if unit_data.get('started_at'):
-                    unit_data['started_at'] = state.units[unit_id].started_at.isoformat()
-                if unit_data.get('completed_at'):
-                    unit_data['completed_at'] = state.units[unit_id].completed_at.isoformat()
-            
-            with open(self.state_file, 'w') as f:
-                json.dump(state_dict, f, indent=2)
-            
-            self._current_state = state
-            
-        except OSError as e:
-            raise OSError(f"Unable to write state.json to {self.project_dir}: {e}")
+            try:
+                # Convert to dict with datetime serialization
+                state_dict = state.model_dump()
+                
+                # Convert datetime objects to ISO format strings
+                if state_dict.get('created_at'):
+                    state_dict['created_at'] = state.created_at.isoformat()
+                if state_dict.get('updated_at'):
+                    state_dict['updated_at'] = state.updated_at.isoformat()
+                
+                for unit_id, unit_data in state_dict.get('units', {}).items():
+                    if unit_data.get('started_at'):
+                        unit_data['started_at'] = state.units[unit_id].started_at.isoformat()
+                    if unit_data.get('completed_at'):
+                        unit_data['completed_at'] = state.units[unit_id].completed_at.isoformat()
+                
+                with open(self.state_file, 'w') as f:
+                    json.dump(state_dict, f, indent=2)
+                
+                self._current_state = state
+                
+            except OSError as e:
+                raise OSError(f"Unable to write state.json to {self.project_dir}: {e}")
     
     def update_unit_status(
         self,
@@ -187,9 +192,10 @@ class StateStore:
             status: New status for the unit
             completion_date: Optional completion timestamp
         """
-        state = self.load_state()
-        state.update_unit_status(unit_id, status, completion_date)
-        self.save_state(state)
+        with self._lock:
+            state = self.load_state()
+            state.update_unit_status(unit_id, status, completion_date)
+            self.save_state(state)
     
     def get_unit_status(self, unit_id: str) -> Optional[str]:
         """
@@ -215,27 +221,28 @@ class StateStore:
         Returns:
             The initialized ProjectState
         """
-        # Load existing state or create new one
-        if self.state_file.exists():
-            try:
-                state = self.load_state()
-            except ValueError:
-                # If existing state is invalid, create new one
+        with self._lock:
+            # Load existing state or create new one
+            if self.state_file.exists():
+                try:
+                    state = self.load_state()
+                except ValueError:
+                    # If existing state is invalid, create new one
+                    state = self._create_default_state(project.project_id)
+            else:
                 state = self._create_default_state(project.project_id)
-        else:
-            state = self._create_default_state(project.project_id)
-        
-        # Add any new units from the project that aren't in state
-        for unit in project.units:
-            if unit.id not in state.units:
-                state.units[unit.id] = UnitState(
-                    id=unit.id,
-                    status=unit.status  # Use status from project model
-                )
-        
-        # Save the initialized state
-        self.save_state(state)
-        return state
+            
+            # Add any new units from the project that aren't in state
+            for unit in project.units:
+                if unit.id not in state.units:
+                    state.units[unit.id] = UnitState(
+                        id=unit.id,
+                        status=unit.status  # Use status from project model
+                    )
+            
+            # Save the initialized state
+            self.save_state(state)
+            return state
     
     def get_progress_summary(self) -> Dict[str, Any]:
         """
