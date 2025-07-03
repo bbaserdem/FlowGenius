@@ -119,7 +119,7 @@ class TopicScaffolderAgent:
             logger.info(f"Successfully created project with {len(units)} units")
             return project
             
-        except Exception as e:
+        except (ValueError, json.JSONDecodeError, ValidationError) as e:
             logger.error(f"Failed to create learning project: {e}", exc_info=True)
             # Return a basic fallback project
             return self._create_fallback_project(topic, motivation, target_units)
@@ -180,7 +180,7 @@ class TopicScaffolderAgent:
                 logger.error(f"Pydantic validation failed: {e}")
                 raise
                 
-        except Exception as e:
+        except (ValueError, AttributeError) as e:
             logger.error(f"Failed to generate units: {e}", exc_info=True)
             # Return fallback units
             return self._create_fallback_units(topic, target_units)
@@ -193,9 +193,6 @@ class TopicScaffolderAgent:
             prompt += f"\n\nLearner's motivation: {motivation}"
         
         prompt += f"\n\nGenerate {target_units} learning units."
-        
-        if self.difficulty_preference:
-            prompt += f"\n\nDifficulty level: {self.difficulty_preference}"
         
         prompt += "\n\nRemember to return valid JSON following the specified structure."
         

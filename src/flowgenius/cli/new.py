@@ -4,11 +4,15 @@ FlowGenius New Project Command
 This module implements the 'flowgenius new' command for creating learning projects.
 """
 
+import logging
 import click
 from pathlib import Path
 
 from ..models.config_manager import ConfigManager
 from ..models.project_generator import ProjectGenerator
+
+# Set up module logger
+logger = logging.getLogger(__name__)
 
 
 @click.command()
@@ -117,9 +121,10 @@ def new(topic: str, motivation: str, units: int, open_project: bool) -> None:
         click.echo("💡 Tip: Run 'flowgenius wizard' to set up your configuration")
         raise click.Abort()
     
-    except Exception as e:
+    except (ValueError, TypeError) as e:
         click.echo(f"❌ Error creating project: {e}")
         click.echo("💡 Tip: Check your configuration and API key")
+        logger.error(f"Error creating project: {e}", exc_info=True)
         raise click.Abort()
 
 

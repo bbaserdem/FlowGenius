@@ -313,7 +313,7 @@ class TestUnitRefinementEngine:
         
         # Mock agent to raise an exception - this will trigger the except block
         with patch.object(engine.resource_curator, 'curate_resources') as mock_curate:
-            mock_curate.side_effect = Exception("Resource curation failed")
+            mock_curate.side_effect = ValueError("Resource curation failed")
             
             result = engine.apply_refinement(sample_learning_unit, processed_feedback)
             

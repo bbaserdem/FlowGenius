@@ -5,6 +5,7 @@ This module processes user feedback to determine specific refinement actions
 for learning units, interfacing with LangChain for intelligent interpretation.
 """
 
+import logging
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
 from openai import OpenAI
@@ -14,6 +15,9 @@ from langchain_core.prompts import PromptTemplate
 from .conversation_manager import UserFeedback
 from ..models.project import LearningUnit
 from ..models.settings import DefaultSettings
+
+# Set up module logger
+logger = logging.getLogger(__name__)
 
 
 class FeedbackCategory(str, Enum):
@@ -222,7 +226,8 @@ class FeedbackProcessor:
             
             return response.choices[0].message.content.strip()
             
-        except Exception as e:
+        except (ValueError, AttributeError) as e:
+            logger.error(f"AI analysis failed: {e}", exc_info=True)
             return f"Analysis error: {str(e)}. Basic interpretation: User provided feedback about the learning unit."
     
     def _extract_categories(self, feedback_text: str) -> List[FeedbackCategory]:
@@ -399,5 +404,9 @@ def create_feedback_processor(api_key: Optional[str] = None, model: str = Defaul
         
         return FeedbackProcessor(client, model)
     
+    except ImportError as e:
+        logger.error(f"Failed to import OpenAI: {e}")
+        raise RuntimeError(f"Failed to create FeedbackProcessor: OpenAI package not installed") from e
     except Exception as e:
-        raise RuntimeError(f"Failed to create FeedbackProcessor: {str(e)}") 
+        logger.error(f"Failed to create FeedbackProcessor: {e}", exc_info=True)
+        raise RuntimeError(f"Failed to create FeedbackProcessor: {str(e)}") from e 

@@ -114,8 +114,13 @@ def _safe_load_config():
         from ..models.config_manager import ConfigManager
         config_manager = ConfigManager()
         return config_manager.load_config()
-    except Exception:
+    except ImportError as e:
         # If config loading fails for any reason, continue without config
+        click.echo(f"⚠️  Warning: Could not import configuration module: {e}")
+        return None
+    except (OSError, IOError) as e:
+        # If config file is inaccessible
+        click.echo(f"⚠️  Warning: Could not load configuration file: {e}")
         return None
 
 
@@ -132,8 +137,13 @@ def _safe_create_renderer(config):
     try:
         from ..models.renderer import MarkdownRenderer
         return MarkdownRenderer(config)
-    except Exception:
+    except ImportError as e:
+        # If renderer import fails, continue without it
+        click.echo(f"⚠️  Warning: Could not import renderer module: {e}")
+        return None
+    except (OSError, AttributeError) as e:
         # If renderer creation fails, continue without it
+        click.echo(f"⚠️  Warning: Could not create renderer: {e}")
         return None
 
 
@@ -273,8 +283,8 @@ def mark_done(unit_id: str, completion_date: Optional[datetime], notes: Optional
                     try:
                         _quick_update_unit_status_markdown(unit_file, "completed", completion_date)
                         click.echo("✅ Markdown file updated (fallback mode)")
-                    except Exception:
-                        click.echo("⚠️  Failed to update markdown file in fallback mode")
+                    except (OSError, IOError) as e:
+                        click.echo(f"⚠️  Failed to update markdown file in fallback mode: {e}")
                 else:
                     click.echo("⚠️  Unit file {unit_file.name} not found, skipping markdown update")
         else:
@@ -285,8 +295,8 @@ def mark_done(unit_id: str, completion_date: Optional[datetime], notes: Optional
                 try:
                     _quick_update_unit_status_markdown(unit_file, "completed", completion_date)
                     click.echo("✅ Markdown file updated (fallback mode)")
-                except Exception:
-                    click.echo("⚠️  Failed to update markdown file in fallback mode")
+                except (OSError, IOError) as e:
+                    click.echo(f"⚠️  Failed to update markdown file in fallback mode: {e}")
             else:
                 click.echo("⚠️  Unit file {unit_file.name} not found, skipping markdown update")
         
@@ -318,7 +328,7 @@ def mark_done(unit_id: str, completion_date: Optional[datetime], notes: Optional
         if completed == total:
             click.echo("🏆 Congratulations! You've completed all units in this project!")
         
-    except Exception as e:
+    except (OSError, IOError, ValueError) as e:
         click.echo(f"❌ Error updating unit: {e}")
         click.echo("💡 Please check file permissions and try again")
         raise click.Abort()
@@ -466,7 +476,7 @@ def start(unit_id: str) -> None:
         summary = state_store.get_progress_summary()
         click.echo(f"📊 Project progress: {summary['completed_units']}/{summary['total_units']} units completed, {summary['in_progress_units']} in progress")
         
-    except Exception as e:
+    except (OSError, IOError, ValueError) as e:
         click.echo(f"❌ Error updating unit: {e}")
         raise click.Abort()
 
@@ -676,8 +686,15 @@ def refine(unit_id: str, dry_run: bool, no_backup: bool) -> None:
         click.echo(f"❌ Import error: {e}")
         click.echo("💡 This feature requires additional dependencies. Please ensure all packages are installed.")
         raise click.Abort()
+    except (OSError, IOError) as e:
+        click.echo(f"❌ File system error during refinement: {e}")
+        raise click.Abort()
+    except ValueError as e:
+        click.echo(f"❌ Invalid data during refinement: {e}")
+        raise click.Abort()
     except Exception as e:
-        click.echo(f"❌ Error during refinement: {e}")
+        click.echo(f"❌ Unexpected error during refinement: {e}")
+        logger.error(f"Unexpected error during refinement: {e}", exc_info=True)
         raise click.Abort()
 
 
@@ -687,7 +704,8 @@ def _get_openai_key(config) -> Optional[str]:
         if hasattr(config, 'openai_key_path') and config.openai_key_path.exists():
             with open(config.openai_key_path, 'r') as f:
                 return f.read().strip()
-    except Exception:
+    except (OSError, IOError) as e:
+        click.echo(f"⚠️  Warning: Could not read API key file: {e}")
         pass
     
     # Try environment variable as fallback

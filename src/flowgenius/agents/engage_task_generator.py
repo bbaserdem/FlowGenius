@@ -100,7 +100,7 @@ class EngageTaskGeneratorAgent:
             logger.info(f"Successfully generated {len(tasks)} tasks for unit {unit.id}")
             return tasks, True
             
-        except Exception as e:
+        except (ValueError, json.JSONDecodeError, TimeoutError) as e:
             logger.error(f"Failed to generate tasks for unit {unit.id}: {e}", exc_info=True)
             # Return fallback tasks
             return self._create_fallback_tasks(unit, request.num_tasks), False
@@ -177,16 +177,12 @@ class EngageTaskGeneratorAgent:
                 logger.info(f"Successfully validated {len(validated_response.tasks)} tasks")
                 return validated_response.tasks
                 
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON parsing failed: {e}")
-                logger.debug(f"Full AI response: {content}")
-                raise
-            except ValidationError as e:
+            except (json.JSONDecodeError, ValidationError) as e:
                 logger.error(f"Pydantic validation failed: {e}")
                 logger.debug(f"Full AI response: {content}")
                 raise
                 
-        except Exception as e:
+        except (json.JSONDecodeError, ValidationError) as e:
             logger.error(f"Failed to generate tasks: {e}", exc_info=True)
             # Return empty list to trigger fallback
             return []

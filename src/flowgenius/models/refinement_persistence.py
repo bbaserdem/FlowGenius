@@ -6,6 +6,7 @@ including project.json updates and markdown file regeneration.
 """
 
 import json
+import logging
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +17,9 @@ from .project import LearningProject, LearningUnit
 from .state_store import StateStore, create_state_store
 from .renderer import MarkdownRenderer
 from ..agents.unit_refinement_engine import RefinementResult
+
+# Set up module logger
+logger = logging.getLogger(__name__)
 
 
 class RefinementBackup(BaseModel):
@@ -112,12 +116,13 @@ class RefinementPersistence:
             if self.renderer:
                 try:
                     self.renderer.sync_with_state(project, self.project_dir)
-                except Exception:
+                except (OSError, IOError) as e:
                     # Non-fatal – keep going even if sync fails
-                    pass
+                    logger.warning(f"Failed to sync markdown with state: {e}")
             
-        except Exception as e:
+        except (OSError, IOError) as e:
             save_results["errors"].append(f"Error saving refined project: {str(e)}")
+            logger.error(f"Error saving refined project: {e}", exc_info=True)
         
         return save_results
     
@@ -148,8 +153,9 @@ class RefinementPersistence:
             shutil.copy2(backup_file, self.project_file)
             restore_results["restored"] = True
             
-        except Exception as e:
+        except (OSError, IOError, shutil.Error) as e:
             restore_results["errors"].append(f"Error restoring backup: {str(e)}")
+            logger.error(f"Error restoring backup: {e}", exc_info=True)
         
         return restore_results
     
@@ -174,8 +180,9 @@ class RefinementPersistence:
             
             return RefinementHistory(**history_data)
             
-        except Exception:
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
             # Return default history if file is corrupted
+            logger.warning(f"Failed to load refinement history: {e}")
             project_id = self.project_dir.name
             return RefinementHistory(project_id=project_id)
     
@@ -330,9 +337,9 @@ class RefinementPersistence:
             # Save updated state
             self.state_store.save_state(state)
             
-        except Exception:
+        except (OSError, IOError, ValueError) as e:
             # Don't fail the entire operation if state update fails
-            pass
+            logger.warning(f"Failed to update refinement state: {e}")
     
     def _create_refinement_summary(self, refinement_results: List[RefinementResult]) -> str:
         """Create a summary of refinement results."""

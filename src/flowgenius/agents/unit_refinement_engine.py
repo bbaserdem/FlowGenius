@@ -123,7 +123,7 @@ class UnitRefinementEngine:
                     else:
                         errors.append(f"Failed to update content: {agent_response.get('error', 'Unknown error')}")
 
-            except Exception as e:
+            except (ValueError, TypeError, AttributeError) as e:
                 error_msg = f"Error applying action '{action.action_type}': {str(e)}"
                 errors.append(error_msg)
                 logger.error(error_msg, exc_info=True)
@@ -184,8 +184,8 @@ class UnitRefinementEngine:
             )
             resources, success = self.resource_curator.curate_resources(request)
             return resources, {"success": success, "count": len(resources)}
-        except Exception as e:
-            logger.error(f"Failed to add resources: {e}")
+        except (ValueError, AttributeError) as e:
+            logger.error(f"Failed to add resources: {e}", exc_info=True)
             return [], {"success": False, "error": str(e)}
     
     def _add_tasks_to_unit(self, unit: LearningUnit, action) -> Tuple[List[EngageTask], Dict[str, Any]]:
@@ -206,8 +206,8 @@ class UnitRefinementEngine:
             tasks, success = self.task_generator.generate_tasks(request)
             
             return tasks, {"success": success, "count": len(tasks)}
-        except Exception as e:
-            logger.error(f"Failed to add tasks: {e}")
+        except (ValueError, AttributeError) as e:
+            logger.error(f"Failed to add tasks: {e}", exc_info=True)
             return [], {"success": False, "error": str(e)}
     
     def _update_unit_content(self, unit: LearningUnit, action) -> Tuple[Dict[str, Any], Dict[str, Any]]:
@@ -245,7 +245,7 @@ class UnitRefinementEngine:
                 return refined_content, {"success": True, "result": refined_content}
             else:
                 return {}, {"success": False, "error": "Content generation failed."}
-        except Exception as e:
+        except (ValueError, AttributeError) as e:
             logger.error(f"Failed to update content via ContentGeneratorAgent: {e}", exc_info=True)
             return {}, {"success": False, "error": str(e)}
 
@@ -258,8 +258,8 @@ class UnitRefinementEngine:
             try:
                 result = self.apply_refinement(unit, feedback)
                 results.append(result)
-            except Exception as e:
-                logger.error(f"Failed to apply refinement to unit {unit.id}: {e}")
+            except (ValueError, TypeError) as e:
+                logger.error(f"Failed to apply refinement to unit {unit.id}: {e}", exc_info=True)
                 error_result = RefinementResult(
                     unit_id=unit.id,
                     refined_unit=unit,
@@ -278,5 +278,9 @@ def create_unit_refinement_engine(api_key: Optional[str] = None, model: str = De
     try:
         client = OpenAI(api_key=api_key) if api_key else OpenAI()
         return UnitRefinementEngine(client, model)
+    except ImportError as e:
+        logger.error(f"Failed to import OpenAI: {e}")
+        raise RuntimeError(f"Failed to create UnitRefinementEngine: OpenAI package not installed") from e
     except Exception as e:
-        raise RuntimeError(f"Failed to create UnitRefinementEngine: {str(e)}")
+        logger.error(f"Failed to create UnitRefinementEngine: {e}", exc_info=True)
+        raise RuntimeError(f"Failed to create UnitRefinementEngine: {str(e)}") from e

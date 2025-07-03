@@ -20,6 +20,8 @@ from .state_store import StateStore, create_state_store
 from ..agents.content_generator import GeneratedContent
 from .settings import DefaultSettings
 
+# Set up module logger
+logger = logging.getLogger(__name__)
 
 class MarkdownRenderer:
     """
@@ -76,8 +78,9 @@ class MarkdownRenderer:
             # Load existing state if available
             try:
                 state = state_store.load_state()
-            except Exception:
+            except (OSError, IOError, ValueError) as e:
                 # No existing state, return default
+                logger.debug(f"No existing state found: {e}")
                 return {
                     "status": unit.status,
                     "started_at": None,
@@ -102,9 +105,9 @@ class MarkdownRenderer:
                     "completed_at": None,
                     "progress_notes": []
                 }
-        except Exception as e:
+        except (OSError, IOError, AttributeError) as e:
             # Fall back to unit data if state is not available
-            logging.debug(f"Failed to get unit state info: {e}")
+            logger.debug(f"Failed to get unit state info: {e}")
             return {
                 "status": unit.status,
                 "started_at": None,
@@ -130,9 +133,9 @@ class MarkdownRenderer:
                 try:
                     unit_state = state_store.get_unit_state(unit.id)
                     unit.status = unit_state.status
-                except Exception:
+                except (KeyError, AttributeError) as e:
                     # Keep original status if state is not available
-                    pass
+                    logger.debug(f"Unit {unit.id} not found in state: {e}")
             
             # Re-render unit files with updated state
             self._write_unit_files(project, project_dir)
@@ -140,9 +143,9 @@ class MarkdownRenderer:
             # Also update TOC to reflect progress
             self._write_toc_file(project, project_dir)
             
-        except Exception:
+        except (OSError, IOError, ValueError) as e:
             # If state sync fails, continue with original project data
-            pass
+            logger.warning(f"Failed to sync with state: {e}")
     
     def render_project_files_with_state(
         self, 
@@ -723,6 +726,7 @@ class MarkdownRenderer:
                 (project_dir / subdir).mkdir(exist_ok=True)
                 
         except OSError as e:
+            logger.error(f"Failed to create project directories: {e}")
             raise OSError(f"Failed to create project directory structure at {project_dir}: {e}") from e
     
     def track_unit_progress(
@@ -780,4 +784,23 @@ class MarkdownRenderer:
             },
             "unit_files": [f"{unit.id}.md" for unit in project.units],
             "estimated_steps": 3 + len(project.units)
-        } 
+        }
+
+    def write_markdown_to_file(self, file_path: Path, content: str) -> None:
+        """
+        Write markdown content to a file, creating parent directories if needed.
+        
+        Args:
+            file_path: Target file path
+            content: Markdown content to write
+            
+        Raises:
+            OSError: If file cannot be written
+        """
+        try:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+        except (OSError, IOError) as e:
+            logger.error(f"Failed to write markdown file {file_path}: {e}")
+            raise 

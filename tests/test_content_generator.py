@@ -98,7 +98,7 @@ class TestContentGeneratorAgent:
         with patch.object(agent.resource_curator, 'curate_resources') as mock_resources, \
              patch.object(agent.task_generator, 'generate_tasks') as mock_tasks:
             
-            mock_resources.side_effect = Exception("Resource generation failed")
+            mock_resources.side_effect = ValueError("Resource generation failed")
             
             request = ContentGenerationRequest(unit=sample_learning_unit)
             content = agent.generate_complete_content(request)

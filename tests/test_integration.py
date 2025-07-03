@@ -67,7 +67,7 @@ class TestIntegration:
         
         # Test with client that fails to generate content but agents handle gracefully
         mock_client = Mock()
-        mock_client.chat.completions.create.side_effect = Exception("API Error")
+        mock_client.chat.completions.create.side_effect = ValueError("API Error")
         
         # Create generator with failing client directly
         from flowgenius.agents.content_generator import ContentGeneratorAgent, ContentGenerationRequest
@@ -243,7 +243,7 @@ class TestErrorHandling:
             learning_objectives=[]
         )
         
-        mock_openai_client.chat.completions.create.side_effect = Exception("API Error")
+        mock_openai_client.chat.completions.create.side_effect = ValueError("API Error")
         
         with patch('flowgenius.agents.content_generator.OpenAI', return_value=mock_openai_client):
             content = generate_unit_content_simple(minimal_unit)

@@ -71,7 +71,7 @@ class TestResourceCuratorAgent:
     def test_curate_resources_api_failure(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test resource curation when API fails."""
         # Simulate API failure
-        mock_openai_client.chat.completions.create.side_effect = Exception("API Error")
+        mock_openai_client.chat.completions.create.side_effect = ValueError("API Error")
         
         agent = ResourceCuratorAgent(mock_openai_client)
         request = ResourceRequest(unit=sample_learning_unit)

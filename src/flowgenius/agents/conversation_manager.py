@@ -145,7 +145,7 @@ class ConversationManager:
             
             # Final fallback
             return "unknown-unit"
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             return "unknown-unit"
     
     def _generate_response(self, feedback: UserFeedback) -> str:
@@ -206,5 +206,8 @@ def create_conversation_manager(api_key: Optional[str] = None, model: str = "gpt
             client = OpenAI()  # Will use environment variable
             
         return ConversationManager(client, model=model)
+    except ImportError as e:
+        raise RuntimeError(f"Failed to create ConversationManager: OpenAI package not installed") from e
     except Exception as e:
-        raise RuntimeError(f"Failed to create ConversationManager: {e}") 
+        logger.error(f"Failed to create ConversationManager: {e}", exc_info=True)
+        raise RuntimeError(f"Failed to create ConversationManager: {e}") from e 

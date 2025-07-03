@@ -111,7 +111,7 @@ class ResourceCuratorAgent:
             logger.info(f"Successfully curated {len(resources)} resources for unit {unit.id}")
             return resources, ai_success
             
-        except Exception as e:
+        except (ValueError, json.JSONDecodeError, ValidationError, TimeoutError) as e:
             logger.error(f"Failed to curate resources for unit {unit.id}: {e}", exc_info=True)
             # Return fallback resources
             fallback_resources = self._create_fallback_resources(request)
@@ -196,7 +196,7 @@ class ResourceCuratorAgent:
                 # Return empty list and failure status
                 return [], False
                 
-        except Exception as e:
+        except (ValueError, AttributeError) as e:
             logger.error(f"Failed to generate resources: {e}", exc_info=True)
             # Return empty list to trigger fallback
             return [], False

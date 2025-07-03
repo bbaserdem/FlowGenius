@@ -5,6 +5,7 @@ This module provides the integrated content generation functionality,
 combining resource curation and engage task generation for learning units.
 """
 
+import logging
 from typing import List, Optional, Dict, Any, Tuple
 from openai import OpenAI
 from pydantic import BaseModel, Field
@@ -13,6 +14,9 @@ from ..models.project import LearningUnit, LearningResource, EngageTask
 from ..models.settings import DefaultSettings
 from .resource_curator import ResourceCuratorAgent, ResourceRequest
 from .engage_task_generator import EngageTaskGeneratorAgent, TaskGenerationRequest
+
+# Set up module logger
+logger = logging.getLogger(__name__)
 
 
 class ContentGenerationRequest(BaseModel):
@@ -117,8 +121,9 @@ class ContentGeneratorAgent:
                 generation_notes=generation_notes
             )
             
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             generation_notes.append(f"Error during generation: {str(e)}")
+            logger.error(f"Error during content generation: {e}", exc_info=True)
             
             # Fallback generation
             return self._generate_fallback_content(request, generation_notes)
@@ -264,8 +269,12 @@ def create_content_generator(api_key: Optional[str] = None, model: str = Default
         
         return ContentGeneratorAgent(client, model)
     
+    except ImportError as e:
+        logger.error(f"Failed to import OpenAI: {e}")
+        raise RuntimeError(f"Failed to create ContentGeneratorAgent: OpenAI package not installed") from e
     except Exception as e:
-        raise RuntimeError(f"Failed to create ContentGeneratorAgent: {str(e)}")
+        logger.error(f"Failed to create ContentGeneratorAgent: {e}", exc_info=True)
+        raise RuntimeError(f"Failed to create ContentGeneratorAgent: {str(e)}") from e
 
 
 def generate_unit_content_simple(unit: LearningUnit, 
