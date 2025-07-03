@@ -139,12 +139,13 @@ def safe_save_json(data: Dict[str, Any], file_path: Path, indent: int = 2) -> bo
         return False
 
 
-def safe_load_yaml(file_path: Path) -> Optional[Dict[str, Any]]:
+def safe_load_yaml(file_path: Path, yaml_width: Optional[int] = None) -> Optional[Dict[str, Any]]:
     """
     Safely load a YAML file with error handling.
     
     Args:
         file_path: Path to YAML file
+        yaml_width: Optional YAML line width (defaults to DefaultSettings.YAML_LINE_WIDTH)
         
     Returns:
         Parsed YAML data or None if loading fails
@@ -152,7 +153,7 @@ def safe_load_yaml(file_path: Path) -> Optional[Dict[str, Any]]:
     try:
         yaml = YAML()
         yaml.preserve_quotes = DefaultSettings.YAML_PRESERVE_QUOTES
-        yaml.width = DefaultSettings.YAML_LINE_WIDTH
+        yaml.width = yaml_width or DefaultSettings.YAML_LINE_WIDTH
         
         with open(file_path, 'r') as f:
             return yaml.load(f)

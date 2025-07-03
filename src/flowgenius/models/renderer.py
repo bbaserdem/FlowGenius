@@ -208,7 +208,7 @@ class MarkdownRenderer:
             # Use ruamel.yaml to properly escape the string
             yaml = YAML()
             yaml.preserve_quotes = DefaultSettings.YAML_PRESERVE_QUOTES
-            yaml.width = DefaultSettings.YAML_LINE_WIDTH
+            yaml.width = self.config.yaml_line_width
             stream = StringIO()
             yaml.dump(value, stream)
             return stream.getvalue().strip()

@@ -72,6 +72,9 @@ class ConfigManager:
             # Ensure config directory exists
             config_path.parent.mkdir(parents=True, exist_ok=True)
             
+            # Use the yaml_line_width from the config
+            self.yaml.width = config.yaml_line_width
+            
             # Convert Path objects to strings for YAML serialization
             config_dict = config.model_dump()
             config_dict['openai_key_path'] = str(config.openai_key_path)

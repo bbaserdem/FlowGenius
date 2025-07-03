@@ -46,6 +46,14 @@ class FlowGeniusConfig(BaseModel):
     backup_projects: bool = Field(default=True, description="Create backups when modifying projects")
     file_format: str = Field(default="markdown", description="Default file format for project files")
     
+    # YAML Configuration
+    yaml_line_width: int = Field(
+        default=DefaultSettings.YAML_LINE_WIDTH, 
+        ge=80, 
+        le=200,
+        description="Maximum line width for YAML output (80-200)"
+    )
+    
     # Link Style
     link_style: Literal["obsidian", "markdown"] = "obsidian"
     
@@ -125,5 +133,6 @@ def create_default_config() -> FlowGeniusConfig:
         default_tasks_per_unit=DefaultSettings.DEFAULT_NUM_TASKS,
         focus_on_application=True,
         backup_projects=True,
-        file_format="markdown"
+        file_format="markdown",
+        yaml_line_width=DefaultSettings.YAML_LINE_WIDTH
     ) 

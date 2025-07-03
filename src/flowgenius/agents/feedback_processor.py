@@ -195,13 +195,13 @@ class FeedbackProcessor:
         Description: {unit.description}
         
         Learning Objectives:
-        {chr(10).join(f"- {obj}" for obj in unit.learning_objectives)}
+        {"\n".join(f"- {obj}" for obj in unit.learning_objectives)}
         
         Current Resources ({len(unit.resources)}):
-        {chr(10).join(f"- {r.title} ({r.type}): {r.description}" for r in unit.resources)}
+        {"\n".join(f"- {r.title} ({r.type}): {r.description}" for r in unit.resources)}
         
         Current Tasks ({len(unit.engage_tasks)}):
-        {chr(10).join(f"- {t.title} ({t.type}): {t.description}" for t in unit.engage_tasks)}
+        {"\n".join(f"- {t.title} ({t.type}): {t.description}" for t in unit.engage_tasks)}
         """.strip()
         
         return context

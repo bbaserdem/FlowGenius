@@ -212,7 +212,7 @@ Unit Title: {unit.title}
 Description: {unit.description}
 
 Learning Objectives:
-{chr(10).join(f"- {obj}" for obj in unit.learning_objectives)}
+{"\n".join(f"- {obj}" for obj in unit.learning_objectives)}
 """
         
         if unit.estimated_duration:

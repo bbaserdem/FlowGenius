@@ -110,7 +110,7 @@ status: {unit.status}
 
 ## Learning Objectives
 
-{chr(10).join(f"- {obj}" for obj in unit.learning_objectives)}
+{"\n".join(f"- {obj}" for obj in unit.learning_objectives)}
 
 ## Resources
 
