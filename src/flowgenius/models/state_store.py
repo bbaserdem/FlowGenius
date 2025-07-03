@@ -14,6 +14,7 @@ import threading
 from pydantic import BaseModel, Field
 
 from .project import LearningProject, LearningUnit
+from ..utils import get_datetime_now, safe_save_json, safe_load_json
 
 
 class UnitState(BaseModel):
@@ -32,8 +33,8 @@ class ProjectState(BaseModel):
     Complete state information for a learning project.
     """
     project_id: str = Field(description="Project identifier")
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=get_datetime_now)
+    updated_at: datetime = Field(default_factory=get_datetime_now)
     units: Dict[str, UnitState] = Field(default_factory=dict, description="Unit states by unit ID")
     
     def get_unit_state(self, unit_id: str) -> Optional[UnitState]:
@@ -56,13 +57,13 @@ class ProjectState(BaseModel):
         
         # Update timestamps based on status changes
         if old_status == "pending" and status == "in-progress":
-            unit_state.started_at = datetime.now()
+            unit_state.started_at = get_datetime_now()
         elif status == "completed":
-            unit_state.completed_at = completion_date or datetime.now()
+            unit_state.completed_at = completion_date or get_datetime_now()
             if unit_state.started_at is None:
                 unit_state.started_at = unit_state.completed_at
         
-        self.updated_at = datetime.now()
+        self.updated_at = get_datetime_now()
     
     def get_progress_summary(self) -> Dict[str, Any]:
         """Get a summary of progress across all units."""
@@ -115,10 +116,12 @@ class StateStore:
                 # Create default state if file doesn't exist
                 return self._create_default_state()
             
+            state_data = safe_load_json(self.state_file)
+            if state_data is None:
+                # If state file exists but couldn't be loaded, it's invalid
+                raise ValueError(f"Invalid state.json file in {self.project_dir}")
+            
             try:
-                with open(self.state_file, 'r') as f:
-                    state_data = json.load(f)
-                
                 # Convert datetime strings back to datetime objects
                 if 'created_at' in state_data:
                     state_data['created_at'] = datetime.fromisoformat(state_data['created_at'])
@@ -133,8 +136,7 @@ class StateStore:
                 
                 self._current_state = ProjectState(**state_data)
                 return self._current_state
-                
-            except (json.JSONDecodeError, TypeError, ValueError) as e:
+            except (TypeError, ValueError) as e:
                 raise ValueError(f"Invalid state.json file in {self.project_dir}: {e}")
     
     def save_state(self, state: Optional[ProjectState] = None) -> None:
@@ -170,10 +172,10 @@ class StateStore:
                     if unit_data.get('completed_at'):
                         unit_data['completed_at'] = state.units[unit_id].completed_at.isoformat()
                 
-                with open(self.state_file, 'w') as f:
-                    json.dump(state_dict, f, indent=2)
-                
-                self._current_state = state
+                if safe_save_json(state_dict, self.state_file):
+                    self._current_state = state
+                else:
+                    raise OSError(f"Unable to write state.json to {self.project_dir}")
                 
             except OSError as e:
                 raise OSError(f"Unable to write state.json to {self.project_dir}: {e}")

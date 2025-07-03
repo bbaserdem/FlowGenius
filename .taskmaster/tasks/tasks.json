@@ -484,9 +484,9 @@
             "id": 3,
             "title": "Extract shared helper code to utils",
             "description": "Deduplicate fallback resource/task builders and emoji dictionaries by moving them into a shared utils/formatting.py module.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
-            "details": "Remove duplicate `import uuid` in `conversation_manager.py`.",
+            "details": "Remove duplicate `import uuid` in `conversation_manager.py`.\n<info added on 2025-07-03T21:21:55.197Z>\nSuccessfully completed the implementation and refactoring of the utils module, centralizing shared helper functions and eliminating code duplication across the codebase.\n</info added on 2025-07-03T21:21:55.197Z>",
             "testStrategy": ""
           },
           {
@@ -611,7 +611,7 @@
     ],
     "metadata": {
       "created": "2025-07-01T17:03:10.935Z",
-      "updated": "2025-07-03T20:36:20.882Z",
+      "updated": "2025-07-03T21:22:32.401Z",
       "description": "Tasks for master context"
     }
   }

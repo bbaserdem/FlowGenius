@@ -17,6 +17,7 @@ from .project import LearningProject, LearningUnit
 from .state_store import StateStore, create_state_store
 from .renderer import MarkdownRenderer
 from ..agents.unit_refinement_engine import RefinementResult
+from ..utils import get_datetime_now, safe_save_json, safe_load_json
 
 # Set up module logger
 logger = logging.getLogger(__name__)
@@ -166,23 +167,25 @@ class RefinementPersistence:
             project_id = self.project_dir.name
             return RefinementHistory(project_id=project_id)
         
-        try:
-            with open(self.history_file, 'r') as f:
-                history_data = json.load(f)
-            
-            # Convert datetime strings back to datetime objects
-            if 'last_backup' in history_data and history_data['last_backup']:
-                backup_data = history_data['last_backup']
-                if 'backup_timestamp' in backup_data:
-                    backup_data['backup_timestamp'] = datetime.fromisoformat(backup_data['backup_timestamp'])
-                if 'original_project_path' in backup_data:
-                    backup_data['original_project_path'] = Path(backup_data['original_project_path'])
-            
-            return RefinementHistory(**history_data)
-            
-        except (json.JSONDecodeError, TypeError, ValueError) as e:
-            # Return default history if file is corrupted
-            logger.warning(f"Failed to load refinement history: {e}")
+        history_data = safe_load_json(self.history_file)
+        if history_data:
+            try:
+                # Convert datetime strings back to datetime objects
+                if 'last_backup' in history_data and history_data['last_backup']:
+                    backup_data = history_data['last_backup']
+                    if 'backup_timestamp' in backup_data:
+                        backup_data['backup_timestamp'] = datetime.fromisoformat(backup_data['backup_timestamp'])
+                    if 'original_project_path' in backup_data:
+                        backup_data['original_project_path'] = Path(backup_data['original_project_path'])
+                
+                return RefinementHistory(**history_data)
+            except (TypeError, ValueError) as e:
+                # Return default history if file is corrupted
+                logger.warning(f"Failed to parse refinement history: {e}")
+                project_id = self.project_dir.name
+                return RefinementHistory(project_id=project_id)
+        else:
+            # Return default history if file doesn't exist or couldn't be loaded
             project_id = self.project_dir.name
             return RefinementHistory(project_id=project_id)
     
@@ -210,7 +213,7 @@ class RefinementPersistence:
     
     def _create_backup(self, refinement_results: List[RefinementResult]) -> RefinementBackup:
         """Create a backup of the current project."""
-        timestamp = datetime.now()
+        timestamp = get_datetime_now()
         backup_id = timestamp.strftime("%Y%m%d_%H%M%S")
         backup_file = self.backups_dir / f"project_{backup_id}.json"
         
@@ -245,8 +248,7 @@ class RefinementPersistence:
                 metadata['updated_at'] = project.metadata.updated_at.isoformat()
         
         # Write to file
-        with open(self.project_file, 'w') as f:
-            json.dump(project_dict, f, indent=2)
+        safe_save_json(project_dict, self.project_file)
     
     def _update_markdown_files(self, project: LearningProject, refinement_results: List[RefinementResult]) -> None:
         """Update markdown files for refined units."""
@@ -277,7 +279,7 @@ class RefinementPersistence:
         
         # Create refinement record
         refinement_record = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": get_datetime_now().isoformat(),
             "project_id": project.project_id,
             "results": [
                 {
@@ -311,8 +313,7 @@ class RefinementPersistence:
             if 'original_project_path' in backup_data:
                 backup_data['original_project_path'] = str(history.last_backup.original_project_path)
         
-        with open(self.history_file, 'w') as f:
-            json.dump(history_dict, f, indent=2)
+        safe_save_json(history_dict, self.history_file)
     
     def _update_refinement_state(self, refinement_results: List[RefinementResult]) -> None:
         """Update state tracking for refinement activity."""
@@ -320,7 +321,7 @@ class RefinementPersistence:
             state = self.state_store.load_state()
             
             # Add refinement tracking to state (extend StateStore if needed)
-            refinement_timestamp = datetime.now()
+            refinement_timestamp = get_datetime_now()
             
             for result in refinement_results:
                 if result.success:

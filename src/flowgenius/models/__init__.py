@@ -9,6 +9,7 @@ from .config import FlowGeniusConfig, get_config_path, get_default_projects_root
 from .config_manager import ConfigManager
 from .project import (
     LearningResource, EngageTask, LearningUnit, ProjectMetadata, LearningProject,
+    UserFeedback, RefinementAction,
     generate_project_id, generate_unit_id
 )
 from .project_generator import ProjectGenerator
@@ -36,6 +37,8 @@ __all__ = [
     "LearningUnit",
     "ProjectMetadata",
     "LearningProject",
+    "UserFeedback",
+    "RefinementAction",
     "generate_project_id",
     "generate_unit_id",
     

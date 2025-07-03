@@ -2,60 +2,69 @@
 FlowGenius Conversation Manager
 
 This module provides conversation management for handling user feedback
-during the unit refinement process using LangChain framework.
+during the unit refinement process.
 """
 
 from typing import Dict, List, Optional, Any, Tuple, Callable
-from openai import OpenAI
-from pydantic import BaseModel, Field
 import uuid
-import datetime
 import logging
 import re
 
-from ..models.project import LearningUnit
-from ..models.settings import DefaultSettings
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
+
+from ..models.project import LearningUnit, UserFeedback
+from ..utils import get_timestamp
 
 logger = logging.getLogger(__name__)
 
 
-class UserFeedback(BaseModel):
-    """Structured representation of user feedback for unit refinement."""
-    unit_id: str = Field(description="ID of the unit being refined")
-    feedback_text: str = Field(description="Raw user feedback")
-    feedback_type: str = Field(default="general", description="Type of feedback")
-    specific_concerns: List[str] = Field(default_factory=list, description="Specific issues identified")
-    suggestions: List[str] = Field(default_factory=list, description="Suggested improvements")
-    suggested_changes: List[str] = Field(default_factory=list, description="Specific suggested changes")
-    priority: str = Field(default="medium", description="Priority level")
-    timestamp: Optional[str] = Field(default=None, description="Timestamp of feedback")
+class ConversationSession:
+    """Represents an active conversation session."""
+    
+    def __init__(self, session_id: str, unit_id: str, unit: LearningUnit) -> None:
+        """
+        Initialize a conversation session.
+        
+        Args:
+            session_id: Unique session identifier
+            unit_id: ID of the learning unit
+            unit: The learning unit instance
+        """
+        self.session_id = session_id
+        self.unit_id = unit_id
+        self.unit = unit
+        self.created_at = get_timestamp()
+        self.feedback_history: List[UserFeedback] = []
 
 
 class ConversationManager:
-    """Manages conversation flow and feedback processing for learning units."""
+    """
+    Manages conversation sessions with learners.
     
-    def __init__(
-        self,
-        openai_client: OpenAI,
-        model: str = DefaultSettings.DEFAULT_MODEL,
-        timestamp_provider: Optional[Callable[[], str]] = None
-    ) -> None:
+    This class handles the creation and management of refinement sessions,
+    processes user feedback, and generates appropriate responses.
+    """
+    
+    def __init__(self, openai_client=None, model: str = "gpt-4o-mini", timestamp_provider: Optional[Callable[[], str]] = None) -> None:
         """
         Initialize the conversation manager.
         
         Args:
-            openai_client: Configured OpenAI client.
-            model: OpenAI model to use for conversations.
-            timestamp_provider: A callable that returns an ISO format timestamp string.
-                                Defaults to datetime.datetime.now().isoformat().
+            openai_client: OpenAI client (kept for backward compatibility)
+            model: Model name (kept for backward compatibility)
+            timestamp_provider: Optional function to provide timestamps.
+                Defaults to utils.get_timestamp().
         """
-        self.client = openai_client
-        self.model = model
+        self.client = openai_client  # Keep for backward compatibility
+        self.model = model  # Keep for backward compatibility
         self.system_prompt = """You are an AI learning assistant helping users refine and improve their learning units. 
         You analyze feedback, ask clarifying questions, and help users articulate specific improvements they want to make. 
         Focus on understanding user needs and converting feedback into actionable refinement suggestions."""
         self.active_sessions: Dict[str, Dict[str, Any]] = {}
-        self._timestamp_provider = timestamp_provider or (lambda: datetime.datetime.now().isoformat())
+        self._timestamp_provider = timestamp_provider or get_timestamp
     
     def start_refinement_session(self, unit: LearningUnit) -> str:
         """
@@ -74,7 +83,7 @@ class ConversationManager:
         self.active_sessions[session_id] = {
             "unit_id": unit.id,
             "unit": unit,
-            "created_at": self._get_timestamp(),
+            "created_at": self._timestamp_provider(),
             "feedback_history": []
         }
         
@@ -104,7 +113,7 @@ class ConversationManager:
             suggestions=[],
             suggested_changes=[],
             priority="medium",
-            timestamp=self._get_timestamp()
+            timestamp=self._timestamp_provider()
         )
         
         # Generate response
@@ -158,31 +167,79 @@ class ConversationManager:
         Returns:
             Response string
         """
-        # Simple response generation for now
-        # In a real implementation, this would use the OpenAI client
+        # Analyze feedback sentiment
+        sentiment = self._analyze_sentiment(feedback.feedback_text)
         
-        base_response = "I understand your feedback"
-        
-        if not feedback.feedback_text.strip():
-            return f"{base_response}. Could you provide more specific details about what you'd like to improve?"
-        
-        if "example" in feedback.feedback_text.lower():
-            return f"{base_response} about needing more examples. I'll help you add practical examples to make the concepts clearer."
-        elif "difficult" in feedback.feedback_text.lower():
-            return f"{base_response} about the difficulty level. Let's work together to adjust the complexity."
-        elif "resource" in feedback.feedback_text.lower():
-            return f"{base_response} about resources. I can help you add more learning materials."
+        # Generate appropriate response based on sentiment and content
+        if sentiment == "positive":
+            response = "I understand your feedback. Thank you for your positive input! "
+        elif sentiment == "negative":
+            response = "I understand your feedback about your concerns. "
         else:
-            return f"{base_response}. Let me help you improve this unit based on your suggestions."
-
-    def _get_timestamp(self) -> str:
-        """
-        Get current timestamp using the configured provider.
+            response = "I understand your feedback. "
         
-        Returns:
-            ISO format timestamp string
+        # Add specific acknowledgment
+        if feedback.specific_concerns:
+            response += f"I've noted your concerns about: {', '.join(feedback.specific_concerns)}. "
+        
+        if feedback.suggestions:
+            response += f"Your suggestions about {', '.join(feedback.suggestions)} are valuable. "
+        
+        response += "I'll work on refining the unit based on your input."
+        
+        return response
+    
+    def _analyze_sentiment(self, text: str) -> str:
         """
-        return self._timestamp_provider()
+        Simple sentiment analysis of feedback text.
+        
+        Args:
+            text: Feedback text to analyze
+            
+        Returns:
+            Sentiment string: 'positive', 'negative', or 'neutral'
+        """
+        positive_words = ["good", "great", "excellent", "helpful", "clear", "useful", "love", "like"]
+        negative_words = ["bad", "poor", "terrible", "confusing", "unclear", "difficult", "hate", "dislike"]
+        
+        text_lower = text.lower()
+        positive_count = sum(1 for word in positive_words if word in text_lower)
+        negative_count = sum(1 for word in negative_words if word in text_lower)
+        
+        if positive_count > negative_count:
+            return "positive"
+        elif negative_count > positive_count:
+            return "negative"
+        else:
+            return "neutral"
+    
+    def get_session_info(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get information about a specific session.
+        
+        Args:
+            session_id: Session identifier
+            
+        Returns:
+            Session information dictionary or None if not found
+        """
+        return self.active_sessions.get(session_id)
+    
+    def end_session(self, session_id: str) -> bool:
+        """
+        End a conversation session.
+        
+        Args:
+            session_id: Session identifier to end
+            
+        Returns:
+            True if session was ended, False if not found
+        """
+        if session_id in self.active_sessions:
+            del self.active_sessions[session_id]
+            logger.info(f"Ended session {session_id}")
+            return True
+        return False
 
 
 def create_conversation_manager(api_key: Optional[str] = None, model: str = "gpt-4o-mini") -> ConversationManager:
@@ -200,6 +257,9 @@ def create_conversation_manager(api_key: Optional[str] = None, model: str = "gpt
         RuntimeError: If OpenAI client creation fails
     """
     try:
+        if OpenAI is None:
+            raise ImportError("OpenAI package not installed")
+        
         if api_key:
             client = OpenAI(api_key=api_key)
         else:
@@ -210,4 +270,6 @@ def create_conversation_manager(api_key: Optional[str] = None, model: str = "gpt
         raise RuntimeError(f"Failed to create ConversationManager: OpenAI package not installed") from e
     except Exception as e:
         logger.error(f"Failed to create ConversationManager: {e}", exc_info=True)
-        raise RuntimeError(f"Failed to create ConversationManager: {e}") from e 
+        raise RuntimeError(f"Failed to create ConversationManager: {e}") from e
+
+ 

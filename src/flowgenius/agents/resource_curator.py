@@ -442,15 +442,7 @@ def format_resources_for_obsidian(resources: List[LearningResource], use_obsidia
             link = f"[{resource.title}]({resource.url})"
         
         # Add type emoji for visual distinction
-        type_emoji = {
-            "video": "🎥",
-            "article": "📖", 
-            "paper": "📄",
-            "tutorial": "🛠️",
-            "documentation": "📋"
-        }
-        
-        emoji = type_emoji.get(resource.type, "📎")
+        emoji = get_resource_emoji(resource.type)
         formatted_resource = f"{emoji} {link}"
         
         if resource.estimated_time:

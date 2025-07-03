@@ -7,8 +7,10 @@ This module defines the data structures for learning projects, units, and resour
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field
+
+from ..utils import get_datetime_now
 
 
 class LearningResource(BaseModel):
@@ -59,11 +61,36 @@ class ProjectMetadata(BaseModel):
     title: str = Field(description="Human-readable project title")
     topic: str = Field(description="Main learning topic")
     motivation: Optional[str] = Field(default=None, description="Why the user wants to learn this")
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=get_datetime_now)
+    updated_at: datetime = Field(default_factory=get_datetime_now)
     estimated_total_time: Optional[str] = Field(default=None, description="Total estimated learning time")
     difficulty_level: Optional[Literal["beginner", "intermediate", "advanced"]] = Field(default=None)
     tags: List[str] = Field(default_factory=list, description="Topic tags for organization")
+
+
+class UserFeedback(BaseModel):
+    """
+    Structured feedback from user for unit refinement.
+    """
+    unit_id: str = Field(description="ID of the unit being refined")
+    feedback_text: str = Field(description="Raw feedback text from user")
+    feedback_type: str = Field(default="general", description="Type of feedback")
+    specific_concerns: List[str] = Field(default_factory=list, description="Specific concerns raised")
+    suggestions: List[str] = Field(default_factory=list, description="Specific suggestions made")
+    suggested_changes: List[str] = Field(default_factory=list, description="Concrete changes suggested")
+    priority: str = Field(default="medium", description="Priority level: low, medium, high")
+    timestamp: Optional[str] = Field(default=None, description="Timestamp of feedback")
+
+
+class RefinementAction(BaseModel):
+    """
+    A specific action to take for refining a learning unit.
+    """
+    action_type: str = Field(description="Type of refinement action")
+    target_component: str = Field(description="Component to modify")
+    description: str = Field(description="Description of the action")
+    priority: int = Field(description="Priority level (1-5)")
+    details: Dict[str, Any] = Field(default_factory=dict, description="Additional action details")
 
 
 class LearningProject(BaseModel):
@@ -92,7 +119,7 @@ class LearningProject(BaseModel):
     
     def update_timestamp(self) -> None:
         """Update the last modified timestamp."""
-        self.metadata.updated_at = datetime.now()
+        self.metadata.updated_at = get_datetime_now()
 
 
 def generate_project_id(topic: str) -> str:

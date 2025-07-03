@@ -13,24 +13,8 @@ from typing import Optional
 
 from ..models.state_store import StateStore, create_state_store
 from ..models.project import LearningProject
-
-
-def _find_project_directory() -> Optional[Path]:
-    """
-    Find the current project directory by looking for project.json.
-    
-    Returns:
-        Path to project directory if found, None otherwise
-    """
-    current_dir = Path.cwd()
-    
-    # Check current directory and parent directories
-    for path in [current_dir] + list(current_dir.parents):
-        project_file = path / "project.json"
-        if project_file.exists():
-            return path
-    
-    return None
+from ..models.settings import DefaultSettings
+from ..utils import find_project_directory, safe_load_json, safe_load_config, get_datetime_now
 
 
 def _load_project_from_directory(project_dir: Path) -> Optional[LearningProject]:
@@ -48,9 +32,8 @@ def _load_project_from_directory(project_dir: Path) -> Optional[LearningProject]
     if not project_file.exists():
         return None
     
-    try:
-        with open(project_file, 'r') as f:
-            project_data = json.load(f)
+    project_data = safe_load_json(project_file)
+    if project_data:
         
         # Basic validation of required structure
         if not isinstance(project_data, dict):
@@ -84,44 +67,27 @@ def _load_project_from_directory(project_dir: Path) -> Optional[LearningProject]
             try:
                 metadata['created_at'] = datetime.fromisoformat(metadata['created_at'])
             except (ValueError, TypeError):
-                metadata['created_at'] = datetime.now()
+                metadata['created_at'] = get_datetime_now()
         else:
-            metadata['created_at'] = datetime.now()
+            metadata['created_at'] = get_datetime_now()
             
         if 'updated_at' in metadata:
             try:
                 metadata['updated_at'] = datetime.fromisoformat(metadata['updated_at'])
             except (ValueError, TypeError):
-                metadata['updated_at'] = datetime.now()
+                metadata['updated_at'] = get_datetime_now()
         else:
-            metadata['updated_at'] = datetime.now()
+            metadata['updated_at'] = get_datetime_now()
         
-        return LearningProject(**project_data)
-        
-    except (json.JSONDecodeError, TypeError, ValueError, KeyError):
+        try:
+            return LearningProject(**project_data)
+        except (TypeError, ValueError, KeyError):
+            return None
+    else:
         return None
 
 
-def _safe_load_config():
-    """
-    Safely load configuration without hanging on import issues.
-    
-    Returns:
-        Config object if successful, None otherwise
-    """
-    try:
-        # Import these only when needed and with timeout
-        from ..models.config_manager import ConfigManager
-        config_manager = ConfigManager()
-        return config_manager.load_config()
-    except ImportError as e:
-        # If config loading fails for any reason, continue without config
-        click.echo(f"⚠️  Warning: Could not import configuration module: {e}")
-        return None
-    except (OSError, IOError) as e:
-        # If config file is inaccessible
-        click.echo(f"⚠️  Warning: Could not load configuration file: {e}")
-        return None
+
 
 
 def _safe_create_renderer(config):
@@ -187,7 +153,7 @@ def mark_done(unit_id: str, completion_date: Optional[datetime], notes: Optional
         flowgenius unit mark-done unit-3 --notes "Great unit, learned a lot!"
     """
     # Find the current project directory
-    project_dir = _find_project_directory()
+    project_dir = find_project_directory()
     if not project_dir:
         click.echo("❌ No FlowGenius project found in current directory or parent directories.")
         click.echo("💡 Tip: Navigate to a project directory or run this command from within a project.")
@@ -216,7 +182,7 @@ def mark_done(unit_id: str, completion_date: Optional[datetime], notes: Optional
     
     # Set completion date
     if completion_date is None:
-        completion_date = datetime.now()
+        completion_date = get_datetime_now()
     
     click.echo(f"📅 Completion date: {completion_date.strftime('%Y-%m-%d %H:%M:%S')}")
     
@@ -240,7 +206,7 @@ def mark_done(unit_id: str, completion_date: Optional[datetime], notes: Optional
         return
     
     # Load configuration for MarkdownRenderer (safely)
-    config = _safe_load_config()
+    config = safe_load_config()
     if not config:
         click.echo("⚠️  No configuration found. Proceeding with state updates only.")
         click.echo("💡 Tip: Run 'flowgenius wizard' to set up configuration for markdown file updates.")
@@ -350,7 +316,7 @@ def status(unit_id: Optional[str], all: bool) -> None:
         flowgenius unit status --all      # Show status for all units
     """
     # Find the current project directory
-    project_dir = _find_project_directory()
+    project_dir = find_project_directory()
     if not project_dir:
         click.echo("❌ No FlowGenius project found in current directory or parent directories.")
         raise click.Abort()
@@ -435,7 +401,7 @@ def start(unit_id: str) -> None:
         flowgenius unit start unit-1
     """
     # Find the current project directory
-    project_dir = _find_project_directory()
+    project_dir = find_project_directory()
     if not project_dir:
         click.echo("❌ No FlowGenius project found in current directory or parent directories.")
         raise click.Abort()
@@ -506,7 +472,7 @@ def refine(unit_id: str, dry_run: bool, no_backup: bool) -> None:
         flowgenius unit refine unit-2 --dry-run
     """
     # Find the current project directory
-    project_dir = _find_project_directory()
+    project_dir = find_project_directory()
     if not project_dir:
         click.echo("❌ No FlowGenius project found in current directory or parent directories.")
         raise click.Abort()
@@ -532,7 +498,7 @@ def refine(unit_id: str, dry_run: bool, no_backup: bool) -> None:
     
     try:
         # Load configuration for OpenAI
-        config = _safe_load_config()
+        config = safe_load_config()
         if not config:
             click.echo("❌ Configuration not found. Please run 'flowgenius wizard' to set up your configuration.")
             raise click.Abort()

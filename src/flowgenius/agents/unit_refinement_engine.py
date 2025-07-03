@@ -16,6 +16,7 @@ from ..models.settings import DefaultSettings
 from .content_generator import ContentGeneratorAgent, ContentGenerationRequest
 from .resource_curator import ResourceCuratorAgent, ResourceRequest
 from .engage_task_generator import EngageTaskGeneratorAgent, TaskGenerationRequest
+from ..utils import get_timestamp
 
 # Set up module logger
 logger = logging.getLogger(__name__)
@@ -150,7 +151,7 @@ class UnitRefinementEngine:
         Record refinement in history for tracking and analysis.
         """
         refinement_record = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": get_timestamp(),
             "unit_id": unit.id,
             "unit_title": unit.title,
             "feedback": feedback,

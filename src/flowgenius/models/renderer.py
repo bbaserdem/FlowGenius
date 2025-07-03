@@ -19,6 +19,7 @@ from .project import LearningProject, LearningUnit, LearningResource, EngageTask
 from .state_store import StateStore, create_state_store
 from ..agents.content_generator import GeneratedContent
 from .settings import DefaultSettings
+from ..utils import safe_save_json, ensure_project_structure
 
 # Set up module logger
 logger = logging.getLogger(__name__)
@@ -340,8 +341,7 @@ class MarkdownRenderer:
         metadata_file = project_dir / "project.json"
         metadata_dict = project.model_dump()
         
-        with open(metadata_file, 'w') as f:
-            json.dump(metadata_dict, f, indent=2, default=str)
+        safe_save_json(metadata_dict, metadata_file)
     
     def _write_toc_file(
         self, 
@@ -716,18 +716,7 @@ class MarkdownRenderer:
         Raises:
             OSError: If directory creation fails due to permissions or other issues
         """
-        try:
-            # Create main project directory
-            project_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Create required subdirectories
-            subdirectories = ["units", "resources", "notes"]
-            for subdir in subdirectories:
-                (project_dir / subdir).mkdir(exist_ok=True)
-                
-        except OSError as e:
-            logger.error(f"Failed to create project directories: {e}")
-            raise OSError(f"Failed to create project directory structure at {project_dir}: {e}") from e
+        ensure_project_structure(project_dir)
     
     def track_unit_progress(
         self,
