@@ -116,10 +116,26 @@ class FallbackUrls:
         return FallbackUrls.youtube_search(f"{topic}_introduction")
     
     @staticmethod
+    def youtube_overview(topic: str) -> str:
+        """Generate YouTube overview search URL."""
+        return FallbackUrls.youtube_search(f"{topic}_overview")
+    
+    @staticmethod
+    def youtube_tutorial_part(topic: str, part_number: int) -> str:
+        """Generate YouTube tutorial search URL for a specific part."""
+        return FallbackUrls.youtube_search(f"{topic}_tutorial_part_{part_number}")
+    
+    @staticmethod
     def wikipedia_article(title: str) -> str:
         """Generate Wikipedia article URL for a given title."""
         clean_title = title.replace(' ', '_')
         return DefaultSettings.WIKIPEDIA_BASE.format(title=clean_title)
+    
+    @staticmethod
+    def wikipedia_guide(topic: str, guide_number: int) -> str:
+        """Generate Wikipedia guide URL for a specific guide number."""
+        clean_topic = topic.replace(' ', '_')
+        return DefaultSettings.WIKIPEDIA_BASE.format(title=f"{clean_topic}_guide_{guide_number}")
 
 
 class ValidationSettings:

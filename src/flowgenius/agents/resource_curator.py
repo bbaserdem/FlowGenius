@@ -324,7 +324,7 @@ Requirements:
         for i in range(count):
             video = LearningResource(
                 title=f"Introduction to {topic} - Part {i+1}",
-                url=f"https://youtube.com/search?q={topic.replace(' ', '+')}_tutorial_part_{i+1}",
+                url=FallbackUrls.youtube_tutorial_part(topic, i+1),
                 type="video",
                 description=f"Video tutorial about {topic}",
                 estimated_time="15-20 min"
@@ -350,7 +350,7 @@ Requirements:
         for i in range(count):
             article = LearningResource(
                 title=f"{topic} - Guide {i+1}",
-                url=f"https://en.wikipedia.org/wiki/{topic.replace(' ', '_')}_guide_{i+1}",
+                url=FallbackUrls.wikipedia_guide(topic, i+1),
                 type="article",
                 description=f"Comprehensive guide about {topic}",
                 estimated_time="10-15 min"
@@ -399,7 +399,7 @@ Requirements:
         for i in range(DefaultSettings.MIN_VIDEO_RESOURCES):
             video = LearningResource(
                 title=f"Introduction to {topic}",
-                url=f"https://youtube.com/search?q={topic.replace(' ', '+')}_introduction",
+                url=FallbackUrls.youtube_introduction(topic),
                 type="video",
                 description=f"Introductory video about {topic}",
                 estimated_time="15-20 min"
@@ -410,7 +410,7 @@ Requirements:
         for i in range(DefaultSettings.MIN_READING_RESOURCES):
             article = LearningResource(
                 title=f"{topic} - Overview",
-                url=f"https://en.wikipedia.org/wiki/{topic.replace(' ', '_')}",
+                url=FallbackUrls.wikipedia_article(topic),
                 type="article", 
                 description=f"Comprehensive overview of {topic}",
                 estimated_time="10-15 min"

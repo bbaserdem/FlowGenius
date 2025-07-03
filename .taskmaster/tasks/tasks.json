@@ -502,9 +502,9 @@
             "id": 6,
             "title": "Standardize newline handling",
             "description": "Replace chr(10) joins with \"\\n\" in prompt construction across all agents and tests.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
-            "details": "Verify consistent newline handling throughout the codebase.",
+            "details": "Verify consistent newline handling throughout the codebase.\n<info added on 2025-07-03T21:25:29.782Z>\nAnalyzed the codebase for chr(10) usage. Found the following occurrences:\n\n1. **feedback_processor.py** (3 instances):\n   - Line 197: `{chr(10).join(f\"- {obj}\" for obj in unit.learning_objectives)}`\n   - Line 200: `{chr(10).join(f\"- {r.title} ({r.type}): {r.description}\" for r in unit.resources)}`\n   - Line 203: `{chr(10).join(f\"- {t.title} ({t.type}): {t.description}\" for t in unit.engage_tasks)}`\n\n2. **engage_task_generator.py** (1 instance):\n   - Line 214: `{chr(10).join(f\"- {obj}\" for obj in unit.learning_objectives)}`\n\n3. **resource_curator.py** (2 instances):\n   - Line 228: `{chr(10).join(f\"- {obj}\" for obj in unit.learning_objectives)}`\n   - Line 288: `{chr(10).join(f\"- {obj}\" for obj in unit.learning_objectives)}`\n\n4. **test_progress_tracking_comprehensive.py** (1 instance):\n   - Line 112: `{chr(10).join(f\"- {obj}\" for obj in unit.learning_objectives)}`\n\nImplementation plan:\n- Replace all instances of `chr(10)` with `\"\\n\"` for consistency and readability\n- This is a simple find-and-replace operation that maintains the same functionality\n- All occurrences are within f-strings or string formatting contexts, making them safe to replace\n</info added on 2025-07-03T21:25:29.782Z>\n<info added on 2025-07-03T21:27:16.444Z>\nSuccessfully completed the standardization of newline handling.\n\nReplaced all 7 instances of `chr(10)` with `\"\\n\"` across the codebase:\n1. feedback_processor.py - 3 instances replaced (lines 197, 200, 203)\n2. engage_task_generator.py - 1 instance replaced (line 214)\n3. resource_curator.py - 2 instances replaced (lines 228, 288)\n4. test_progress_tracking_comprehensive.py - 1 instance replaced (line 112)\n\nVerification completed: No remaining `chr(10)` instances in the source code. The only remaining references are in the task metadata itself.\n\nThis change improves code readability and consistency while maintaining the exact same functionality.\n</info added on 2025-07-03T21:27:16.444Z>",
             "testStrategy": ""
           },
           {
@@ -529,9 +529,9 @@
             "id": 9,
             "title": "Reduce YAML line width and make configurable",
             "description": "Change ruamel YAML width from 4096 to 120 (or configurable) to keep diffs readable.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
-            "details": "Address YAML width in `config_manager.py` and `renderer.py`.",
+            "details": "Address YAML width in `config_manager.py` and `renderer.py`.\n<info added on 2025-07-03T21:29:48.337Z>\nAnalyzed the YAML line width configuration:\n\nCurrent Status:\n1. YAML line width is already set to 120 in `DefaultSettings.YAML_LINE_WIDTH` (settings.py line 22)\n2. This setting is being used in 4 places:\n   - utils.py (line 154): `yaml.width = DefaultSettings.YAML_LINE_WIDTH`\n   - config_manager.py (line 27): `self.yaml.width = DefaultSettings.YAML_LINE_WIDTH`\n   - renderer.py (line 210): `yaml.width = DefaultSettings.YAML_LINE_WIDTH`\n   - settings.py (line 22): Definition of the constant\n\nHowever, the setting is NOT configurable via the config file - it's a hardcoded constant.\n\nImplementation Plan:\n1. Add `yaml_line_width` field to `FlowGeniusConfig` model in config.py\n2. Update the 3 usage locations to check config first, then fall back to DefaultSettings\n3. Add validation to ensure reasonable width values (e.g., between 80 and 200)\n4. Test that YAML output respects the configured width\n</info added on 2025-07-03T21:29:48.337Z>\n<info added on 2025-07-03T21:32:24.386Z>\nSuccessfully implemented configurable YAML line width.\n\nChanges made:\n1. Added `yaml_line_width` field to `FlowGeniusConfig` model in config.py:\n   - Default value: 120 (from DefaultSettings.YAML_LINE_WIDTH)\n   - Validation: Must be between 80 and 200\n   - Description: \"Maximum line width for YAML output (80-200)\"\n\n2. Updated `config_manager.py`:\n   - Modified `save_config()` to use `config.yaml_line_width` when saving YAML\n\n3. Updated `renderer.py`:\n   - Modified `_escape_yaml_value()` to use `self.config.yaml_line_width`\n\n4. Updated `utils.py`:\n   - Modified `safe_load_yaml()` to accept optional `yaml_width` parameter\n   - Falls back to DefaultSettings.YAML_LINE_WIDTH if not provided\n\n5. Updated `create_default_config()`:\n   - Added `yaml_line_width` field when creating default config\n\nThe YAML line width is now fully configurable via the config file while maintaining backward compatibility.\n</info added on 2025-07-03T21:32:24.386Z>",
             "testStrategy": ""
           },
           {
@@ -547,9 +547,9 @@
             "id": 11,
             "title": "Centralize fallback base URLs",
             "description": "Define YouTube and Wikipedia fallback search URL patterns in a single helper to avoid magic strings.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
-            "details": "Identify and centralize YouTube/Wikipedia search patterns.",
+            "details": "Identify and centralize YouTube/Wikipedia search patterns.\n<info added on 2025-07-03T21:38:42.554Z>\nInitial exploration findings:\n\nFINDINGS:\n- FallbackUrls class already exists in settings.py with basic helpers\n- Direct URL construction found in 6 places across 2 agent files:\n  * content_generator.py: lines 219, 226\n  * resource_curator.py: lines 326, 352, 401, 412\n- Need to add these URL patterns to FallbackUrls:\n  * YouTube overview search\n  * YouTube tutorial parts (numbered)\n  * Wikipedia guides (numbered)\n- All instances use inline string replacement (replace(' ', '+') for YouTube, replace(' ', '_') for Wikipedia)\n\nIMPLEMENTATION PLAN:\n1. Extend FallbackUrls class with new methods:\n   - youtube_overview()\n   - youtube_tutorial_part()\n   - wikipedia_guide()\n2. Update agents to import and use FallbackUrls\n3. Replace all 6 inline URL constructions with helper calls\n</info added on 2025-07-03T21:38:42.554Z>\n<info added on 2025-07-03T21:41:19.436Z>\nIMPLEMENTATION COMPLETE:\n\nSuccessfully centralized all YouTube and Wikipedia fallback URL patterns:\n\n1. Extended FallbackUrls class in settings.py with new methods:\n   - youtube_overview() - For overview searches\n   - youtube_tutorial_part() - For numbered tutorial parts\n   - wikipedia_guide() - For numbered guide pages\n\n2. Updated content_generator.py:\n   - Imported FallbackUrls from settings\n   - Replaced 2 inline URL constructions with helper calls\n   - Lines 219 and 226 now use centralized methods\n\n3. Updated resource_curator.py:\n   - Replaced 4 inline URL constructions with helper calls\n   - Lines 326, 352, 401, 412 now use centralized methods\n\n4. All tests passing:\n   - test_resource_curator.py: 16 passed\n   - test_content_generator.py: 19 passed\n\nBENEFITS:\n- No more magic strings scattered in code\n- Consistent URL formatting (spaces replaced correctly)\n- Easy to modify URL patterns in one place\n- Better maintainability and readability\n</info added on 2025-07-03T21:41:19.436Z>",
             "testStrategy": ""
           },
           {
@@ -611,7 +611,7 @@
     ],
     "metadata": {
       "created": "2025-07-01T17:03:10.935Z",
-      "updated": "2025-07-03T21:22:32.401Z",
+      "updated": "2025-07-03T21:41:34.529Z",
       "description": "Tasks for master context"
     }
   }

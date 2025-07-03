@@ -11,7 +11,7 @@ from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from ..models.project import LearningUnit, LearningResource, EngageTask
-from ..models.settings import DefaultSettings
+from ..models.settings import DefaultSettings, FallbackUrls
 from .resource_curator import ResourceCuratorAgent, ResourceRequest
 from .engage_task_generator import EngageTaskGeneratorAgent, TaskGenerationRequest
 
@@ -217,14 +217,14 @@ class ContentGeneratorAgent:
         fallback_resources = [
             LearningResource(
                 title=f"{unit.title} - Video Overview",
-                url=f"https://youtube.com/search?q={unit.title.replace(' ', '+')}_overview",
+                url=FallbackUrls.youtube_overview(unit.title),
                 type="video",
                 description=f"Video overview of {unit.title} concepts",
                 estimated_time="15-20 min"
             ),
             LearningResource(
                 title=f"{unit.title} - Reference Material",
-                url=f"https://en.wikipedia.org/wiki/{unit.title.replace(' ', '_')}",
+                url=FallbackUrls.wikipedia_article(unit.title),
                 type="article",
                 description=f"Reference material for {unit.title}",
                 estimated_time="10-15 min"
