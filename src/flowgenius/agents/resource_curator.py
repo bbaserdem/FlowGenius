@@ -254,9 +254,21 @@ Requirements:
         Returns:
             Estimated time for the resource
         """
-        # This is a placeholder implementation. You might want to implement
-        # a more robust time estimation logic based on the resource type.
-        return "15-20 min"
+        time_estimates = {
+            "video": "10-20 min",
+            "article": "15-25 min",
+            "tutorial": "30-45 min",
+            "documentation": "20-30 min",
+            "book": "60+ min",
+            "course": "2-4 hours",
+            "podcast": "20-40 min",
+            "paper": "30-45 min",
+            "guide": "25-35 min",
+            "reference": "10-15 min"
+        }
+        
+        # Return specific estimate or default
+        return time_estimates.get(resource_type.lower(), "15-20 min")
     
     def _build_system_prompt(self) -> str:
         """

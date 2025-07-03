@@ -204,43 +204,8 @@ class TopicScaffolderAgent:
         """
         logger.warning(f"Creating fallback project for topic: {topic}")
         
-        units = [
-            LearningUnit(
-                id="unit-1",
-                title=f"Introduction to {topic.title()}",
-                description=f"Get familiar with the basics and foundations of {topic}",
-                learning_objectives=[
-                    f"Understand what {topic} is and why it's important",
-                    "Identify key concepts and terminology",
-                    "Set clear learning goals for your journey"
-                ],
-                estimated_duration="1-2 hours"
-            ),
-            LearningUnit(
-                id="unit-2", 
-                title=f"Core Concepts of {topic.title()}",
-                description=f"Dive deeper into the fundamental concepts of {topic}",
-                learning_objectives=[
-                    "Master the core principles and concepts",
-                    "Apply basic techniques and methods",
-                    "Practice with hands-on examples"
-                ],
-                prerequisites=["unit-1"],
-                estimated_duration="2-3 hours"
-            ),
-            LearningUnit(
-                id="unit-3",
-                title=f"Practical Application of {topic.title()}",
-                description=f"Apply your knowledge of {topic} to real-world scenarios",
-                learning_objectives=[
-                    "Complete practical exercises and projects",
-                    "Integrate concepts into a cohesive understanding",
-                    "Plan next steps for continued learning"
-                ],
-                prerequisites=["unit-2"],
-                estimated_duration="2-4 hours"
-            )
-        ]
+        # Reuse the fallback units generation
+        units = self._create_fallback_units(topic, target_units)
         
         return LearningProject(
             project_id=generate_project_id(),
@@ -250,13 +215,47 @@ class TopicScaffolderAgent:
                 motivation=motivation,
                 estimated_total_time=self._estimate_total_time(units)
             ),
-            units=units[:target_units]
+            units=units
         )
     
     def _estimate_total_time(self, units: List[LearningUnit]) -> str:
         """Estimate the total time required to complete the project."""
-        total_time = sum(unit.estimated_duration for unit in units)
-        return f"{total_time:.2f} hours"
+        total_hours = 0.0
+        
+        for unit in units:
+            if unit.estimated_duration:
+                # Parse duration strings like "1-2 hours", "30 min", etc.
+                duration_str = unit.estimated_duration.lower()
+                if "-" in duration_str:
+                    # Handle ranges like "1-2 hours"
+                    parts = duration_str.split("-")
+                    if len(parts) == 2:
+                        try:
+                            # Take the average of the range
+                            min_val = float(parts[0].strip().split()[0])
+                            max_val = float(parts[1].strip().split()[0])
+                            hours = (min_val + max_val) / 2
+                            if "min" in duration_str:
+                                hours = hours / 60  # Convert minutes to hours
+                            total_hours += hours
+                        except (ValueError, IndexError):
+                            # Default to 2 hours if parsing fails
+                            total_hours += 2.0
+                else:
+                    # Handle single values like "2 hours" or "30 min"
+                    try:
+                        value = float(duration_str.split()[0])
+                        if "min" in duration_str:
+                            value = value / 60  # Convert minutes to hours
+                        total_hours += value
+                    except (ValueError, IndexError):
+                        # Default to 2 hours if parsing fails
+                        total_hours += 2.0
+            else:
+                # Default to 2 hours per unit if no duration specified
+                total_hours += 2.0
+                
+        return f"{total_hours:.1f} hours"
     
     def _create_fallback_units(self, topic: str, target_units: int) -> List[LearningUnit]:
         """

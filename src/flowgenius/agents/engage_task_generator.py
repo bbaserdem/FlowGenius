@@ -248,9 +248,21 @@ Requirements:
         Returns:
             Estimated time for the task
         """
-        # Implement time estimation logic based on task type
-        # This is a placeholder and should be replaced with actual implementation
-        return "15 min"
+        time_estimates = {
+            "practice": "20-30 min",
+            "reflection": "10-15 min",
+            "project": "45-60 min",
+            "exercise": "15-25 min",
+            "quiz": "10-20 min",
+            "discussion": "15-20 min",
+            "research": "30-45 min",
+            "hands-on": "25-40 min",
+            "review": "15-20 min",
+            "application": "30-45 min"
+        }
+        
+        # Return specific estimate or default
+        return time_estimates.get(task_type.lower(), "20-30 min")
     
     def _create_fallback_tasks(self, unit: LearningUnit, num_tasks: int) -> List[EngageTask]:
         """
