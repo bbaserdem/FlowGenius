@@ -5,7 +5,7 @@ This package contains Pydantic data models and schemas for representing
 learning projects, units, resources, and configuration.
 """
 
-from .config import FlowGeniusConfig, get_config_path, get_default_projects_root, get_default_openai_key_path
+from .config import FlowGeniusConfig, get_config_path, get_default_projects_root
 from .config_manager import ConfigManager
 from .project import (
     LearningResource, EngageTask, LearningUnit, ProjectMetadata, LearningProject,
@@ -13,6 +13,7 @@ from .project import (
 )
 from .project_generator import ProjectGenerator
 from .renderer import MarkdownRenderer
+from .settings import DefaultSettings, FallbackUrls, ValidationSettings, get_resource_emoji, get_task_emoji
 from .state_store import StateStore, ProjectState, UnitState, create_state_store
 
 __all__ = [
@@ -21,7 +22,13 @@ __all__ = [
     "ConfigManager", 
     "get_config_path",
     "get_default_projects_root",
-    "get_default_openai_key_path",
+    
+    # Settings
+    "DefaultSettings",
+    "FallbackUrls",
+    "ValidationSettings", 
+    "get_resource_emoji",
+    "get_task_emoji",
     
     # Project models
     "LearningResource",
