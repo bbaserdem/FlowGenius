@@ -22,12 +22,14 @@ from src.flowgenius.cli.unit import unit, mark_done, status, start
 @pytest.fixture
 def sample_config(tmp_path):
     """Create a sample configuration for testing."""
-    return FlowGeniusConfig(
-        openai_key_path=tmp_path / "openai_key",
-        projects_root=tmp_path / "projects",
-        link_style="markdown",
-        default_model="gpt-4o-mini"
-    )
+    # Since the config validates path existence, we mock it for testing
+    with patch('pathlib.Path.exists', return_value=True):
+        return FlowGeniusConfig(
+            openai_key_path=tmp_path / "openai_key",
+            projects_root=tmp_path / "projects",
+            link_style="markdown",
+            default_model="gpt-4o-mini"
+        )
 
 
 @pytest.fixture

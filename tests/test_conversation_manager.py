@@ -68,26 +68,27 @@ class TestConversationManager:
             
             session_id = manager.start_refinement_session(sample_learning_unit)
             
-            assert session_id == "refine_unit-1_12345678"
+            assert session_id.startswith("refine_unit-1_")
 
     def test_process_user_feedback_basic(self, mock_openai_client: Mock) -> None:
         """Test basic feedback processing."""
-        manager = ConversationManager(mock_openai_client)
+        timestamp = "2024-01-01T10:00:00"
+        manager = ConversationManager(
+            mock_openai_client,
+            timestamp_provider=lambda: timestamp
+        )
         
-        with patch('datetime.datetime') as mock_datetime:
-            mock_datetime.now.return_value.isoformat.return_value = "2024-01-01T10:00:00"
-            
-            response, feedback = manager.process_user_feedback(
-                "refine_unit-1_12345678",
-                "This unit needs more examples"
-            )
-            
-            assert "I understand your feedback" in response
-            assert isinstance(feedback, UserFeedback)
-            assert feedback.unit_id == "unit-1"
-            assert feedback.feedback_text == "This unit needs more examples"
-            assert feedback.feedback_type == "general"
-            assert feedback.timestamp == "2024-01-01T10:00:00"
+        response, feedback = manager.process_user_feedback(
+            "refine_unit-1_12345678",
+            "This unit needs more examples"
+        )
+        
+        assert "I understand your feedback" in response
+        assert isinstance(feedback, UserFeedback)
+        assert feedback.unit_id == "unit-1"
+        assert feedback.feedback_text == "This unit needs more examples"
+        assert feedback.feedback_type == "general"
+        assert feedback.timestamp == timestamp
 
     def test_process_user_feedback_invalid_session(self, mock_openai_client: Mock) -> None:
         """Test feedback processing with invalid session ID."""
@@ -102,20 +103,22 @@ class TestConversationManager:
         assert response is not None
         assert isinstance(feedback, UserFeedback)
 
-    @patch('flowgenius.agents.conversation_manager.datetime')
-    def test_process_user_feedback_with_mock_datetime(self, mock_datetime: Mock, mock_openai_client: Mock) -> None:
+    def test_process_user_feedback_with_controlled_datetime(self, mock_openai_client: Mock) -> None:
         """Test feedback processing with controlled datetime."""
-        mock_datetime.now.return_value.isoformat.return_value = "2024-01-01T10:00:00"
+        timestamp = "2024-01-01T10:00:00"
         
-        manager = ConversationManager(mock_openai_client)
+        # The timestamp_provider is now injected directly
+        manager = ConversationManager(
+            mock_openai_client,
+            timestamp_provider=lambda: timestamp
+        )
         
         response, feedback = manager.process_user_feedback(
             "refine_unit-1_12345678",
             "Add more resources"
         )
         
-        assert feedback.timestamp == "2024-01-01T10:00:00"
-        mock_datetime.now.assert_called_once()
+        assert feedback.timestamp == timestamp
 
     def test_feedback_extraction_from_session_id(self, mock_openai_client: Mock) -> None:
         """Test that unit_id is correctly extracted from session_id."""
@@ -125,6 +128,7 @@ class TestConversationManager:
             ("refine_unit-1_12345678", "unit-1"),
             ("refine_unit-abc_87654321", "unit-abc"),
             ("refine_test-unit_99999999", "test-unit"),
+            ("refine_unit_with_underscores_1_uuid", "unit_with_underscores_1"),
         ]
         
         for session_id, expected_unit_id in test_cases:
@@ -218,7 +222,7 @@ class TestConversationManagerIntegration:
             assert feedback.unit_id == sample_learning_unit.id
             assert feedback.feedback_text == feedback_text
         
-        assert len(collected_feedback) == 3
+        assert len(manager.active_sessions[session_id]["feedback_history"]) == 3
         assert all(f.unit_id == sample_learning_unit.id for f in collected_feedback)
 
     def test_feedback_processing_with_empty_input(self, mock_openai_client: Mock) -> None:

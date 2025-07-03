@@ -9,7 +9,7 @@ import json
 import pytest
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from src.flowgenius.models.renderer import MarkdownRenderer
 from src.flowgenius.models.config import FlowGeniusConfig
@@ -20,11 +20,12 @@ from src.flowgenius.models.state_store import StateStore, UnitState, ProjectStat
 @pytest.fixture
 def sample_config(tmp_path):
     """Create a sample configuration for testing."""
-    return FlowGeniusConfig(
-        openai_key_path=tmp_path / "openai_key",
-        projects_root=tmp_path / "projects",
-        link_style="markdown"
-    )
+    with patch('pathlib.Path.exists', return_value=True):
+        return FlowGeniusConfig(
+            openai_key_path=tmp_path / "openai_key",
+            projects_root=tmp_path / "projects",
+            link_style="markdown"
+        )
 
 
 @pytest.fixture

@@ -27,8 +27,8 @@ class TestIntegration:
         mock_responses = [
             # Resource curator response
             '{"resources": [{"title": "Python Tutorial", "url": "https://youtube.com/test", "type": "video", "description": "Great tutorial", "estimated_time": "30 min"}, {"title": "Python Guide", "url": "https://docs.python.org", "type": "article", "description": "Official docs", "estimated_time": "45 min"}]}',
-            # Task generator response  
-            '{"tasks": [{"title": "Build a Calculator", "description": "Create a simple calculator app", "type": "project", "estimated_time": "60 min"}]}'
+            # Task generator response
+            '{"tasks": [{"title": "Build a Calculator", "description": "Create a simple calculator app", "type": "project", "instructions": "Use basic arithmetic operations.", "estimated_time": "60 min"}]}'
         ]
         
         # Configure mock to return different responses for each call
@@ -87,7 +87,7 @@ class TestIntegration:
         """Test integration with different types of learning units."""
         # Mock consistent responses
         mock_resource_response = '{"resources": [{"title": "Test Video", "url": "https://test.com", "type": "video", "description": "Test", "estimated_time": "20 min"}]}'
-        mock_task_response = '{"tasks": [{"title": "Test Task", "description": "Do something", "type": "practice", "estimated_time": "30 min"}]}'
+        mock_task_response = '{"tasks": [{"title": "Test Task", "description": "Do something", "type": "practice", "instructions": "Follow these steps.", "estimated_time": "30 min"}]}'
         
         mock_openai_client.chat.completions.create.side_effect = [
             Mock(choices=[Mock(message=Mock(content=mock_resource_response))]),
@@ -131,7 +131,7 @@ class TestIntegration:
         # Mock responses (need 6 total: 3 resource calls + 3 task calls)
         mock_responses = [
             '{"resources": [{"title": "Video", "url": "https://test.com", "type": "video", "description": "Test", "estimated_time": "20 min"}]}',
-            '{"tasks": [{"title": "Task", "description": "Do something", "type": "practice", "estimated_time": "30 min"}]}'
+            '{"tasks": [{"title": "Task", "description": "Do something", "type": "practice", "instructions": "Practice makes perfect.", "estimated_time": "30 min"}]}'
         ] * 3
         
         mock_openai_client.chat.completions.create.side_effect = [
@@ -153,7 +153,7 @@ class TestIntegration:
     def test_obsidian_vs_standard_formatting_integration(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test different link formatting options."""
         mock_resource_response = '{"resources": [{"title": "Test Resource", "url": "https://example.com", "type": "article", "description": "Test", "estimated_time": "15 min"}]}'
-        mock_task_response = '{"tasks": [{"title": "Test Task", "description": "Do test", "type": "reflection", "estimated_time": "10 min"}]}'
+        mock_task_response = '{"tasks": [{"title": "Test Task", "description": "Do test", "type": "reflection", "instructions": "Reflect on this.", "estimated_time": "10 min"}]}'
         
         # Setup mock to return both responses in sequence
         mock_openai_client.chat.completions.create.side_effect = [

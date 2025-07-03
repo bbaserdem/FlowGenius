@@ -15,6 +15,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "ruamel.yaml>=0.18.0",
     "textual>=0.80.0",
+    "questionary>=2.1.0",
 ]
 
 [project.scripts]

@@ -24,6 +24,8 @@ class RefinementBackup(BaseModel):
     original_project_path: Path = Field(description="Path to original project.json backup")
     backup_timestamp: datetime = Field(description="When backup was created")
     refinement_summary: str = Field(description="Summary of refinements")
+    # Reason provided by the user for triggering the backup (optional).
+    backup_reason: Optional[str] = Field(default=None, description="Reason backup was created")
 
 
 class RefinementHistory(BaseModel):
@@ -105,6 +107,14 @@ class RefinementPersistence:
             # Update state tracking
             self._update_refinement_state(refinement_results)
             save_results["state_updated"] = True
+            
+            # Ensure markdown reflects any status changes tracked in state.json
+            if self.renderer:
+                try:
+                    self.renderer.sync_with_state(project, self.project_dir)
+                except Exception:
+                    # Non-fatal – keep going even if sync fails
+                    pass
             
         except Exception as e:
             save_results["errors"].append(f"Error saving refined project: {str(e)}")
@@ -342,6 +352,37 @@ class RefinementPersistence:
             summary_parts.append(f"{failed_count} units had errors")
         
         return "; ".join(summary_parts)
+
+    # ---------------------------------------------------------------------
+    # Public helpers
+    # ---------------------------------------------------------------------
+
+    def create_backup(self, backup_reason: str, refinement_results: Optional[List[RefinementResult]] = None) -> RefinementBackup:  # noqa: D401
+        """Create a backup of the current project in a public-facing API.
+
+        This wrapper exists primarily for unit-test convenience. It delegates to
+        the internal ``_create_backup`` method while attaching the *reason* to
+        the returned ``RefinementBackup`` instance so callers can inspect it.
+
+        Args:
+            backup_reason: Short description for why the backup is being taken.
+            refinement_results: Optional list of refinement results to include
+                in the backup summary.  Defaults to an empty list, allowing the
+                method to be used outside the refinement flow (e.g. manual
+                backups).
+
+        Returns:
+            RefinementBackup enriched with the supplied ``backup_reason``.
+        """
+        if refinement_results is None:
+            refinement_results = []
+
+        backup = self._create_backup(refinement_results)
+        # Attach the user-supplied reason. Using ``model_copy`` keeps the model
+        # immutable by default while returning an updated instance.
+        backup_dict = backup.model_dump()
+        backup_dict["backup_reason"] = backup_reason
+        return RefinementBackup(**backup_dict)
 
 
 def create_refinement_persistence(project_dir: Path, renderer: Optional[MarkdownRenderer] = None) -> RefinementPersistence:

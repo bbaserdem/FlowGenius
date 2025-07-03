@@ -11,11 +11,14 @@ from typing import List, Optional, Dict, Any
 import json
 from datetime import datetime
 from ruamel.yaml import YAML
+from io import StringIO
+import logging
 
 from .config import FlowGeniusConfig
 from .project import LearningProject, LearningUnit, LearningResource, EngageTask
 from .state_store import StateStore, create_state_store
 from ..agents.content_generator import GeneratedContent
+from .settings import DefaultSettings
 
 
 class MarkdownRenderer:
@@ -38,39 +41,53 @@ class MarkdownRenderer:
             config: FlowGenius configuration object
         """
         self.config = config
-        self._state_store: Optional[StateStore] = None
+        self._cached_state_stores: Dict[str, StateStore] = {}
     
     def _get_state_store(self, project_dir: Path) -> StateStore:
         """
-        Get or create a StateStore for the given project directory.
+        Get or create a StateStore instance for the given project directory.
+        Caches instances to avoid recreating them.
         
         Args:
-            project_dir: Path to the project directory
+            project_dir: Project directory path
             
         Returns:
             StateStore instance for the project
         """
-        if self._state_store is None or self._state_store.project_dir != project_dir:
-            self._state_store = create_state_store(project_dir)
-        return self._state_store
+        project_key = str(project_dir)
+        if project_key not in self._cached_state_stores:
+            self._cached_state_stores[project_key] = StateStore(project_dir)
+        return self._cached_state_stores[project_key]
     
     def _get_unit_state_info(self, unit: LearningUnit, project_dir: Path) -> Dict[str, Any]:
         """
-        Get state information for a unit, combining project model with state.json data.
+        Get unit state information from the state store.
         
         Args:
             unit: The learning unit
-            project_dir: Path to the project directory
+            project_dir: Project directory path
             
         Returns:
-            Dictionary with current status, completion date, and other state info
+            Dictionary with state information including status, timestamps, notes
         """
         try:
             state_store = self._get_state_store(project_dir)
-            state = state_store.load_state()
-            unit_state = state.get_unit_state(unit.id)
             
-            if unit_state:
+            # Load existing state if available
+            try:
+                state = state_store.load_state()
+            except Exception:
+                # No existing state, return default
+                return {
+                    "status": unit.status,
+                    "started_at": None,
+                    "completed_at": None,
+                    "progress_notes": []
+                }
+            
+            # Get unit state from loaded state
+            if unit.id in state.units:
+                unit_state = state.units[unit.id]
                 return {
                     "status": unit_state.status,
                     "started_at": unit_state.started_at,
@@ -78,15 +95,16 @@ class MarkdownRenderer:
                     "progress_notes": unit_state.progress_notes
                 }
             else:
-                # Fall back to project model data
+                # Unit not in state, return default
                 return {
                     "status": unit.status,
                     "started_at": None,
                     "completed_at": None,
                     "progress_notes": []
                 }
-        except Exception:
-            # If state loading fails, fall back to project model
+        except Exception as e:
+            # Fall back to unit data if state is not available
+            logging.debug(f"Failed to get unit state info: {e}")
             return {
                 "status": unit.status,
                 "started_at": None,
@@ -96,37 +114,34 @@ class MarkdownRenderer:
     
     def sync_with_state(self, project: LearningProject, project_dir: Path) -> None:
         """
-        Synchronize all unit markdown files with current state.json data.
-        
-        This method ensures that all unit files reflect the current status
-        and completion information stored in state.json.
+        Synchronize project unit statuses with the state store.
+        Updates the project in-memory to reflect current state and re-renders unit files.
         
         Args:
-            project: The learning project
-            project_dir: Path to the project directory
+            project: Learning project to sync
+            project_dir: Project directory containing state
         """
         try:
             state_store = self._get_state_store(project_dir)
-            # Initialize state store with project units if needed
             state_store.initialize_from_project(project)
             
-            units_dir = project_dir / "units"
-            if not units_dir.exists():
-                return
-            
-            # Update each unit file with current state data
+            # Update unit statuses from state
             for unit in project.units:
-                unit_file = units_dir / f"{unit.id}.md"
-                if unit_file.exists():
-                    state_info = self._get_unit_state_info(unit, project_dir)
-                    self.update_unit_progress(
-                        unit_file, 
-                        state_info["status"], 
-                        state_info["completed_at"]
-                    )
-        except Exception as e:
-            # Log the error but don't fail the operation
-            # In a production environment, you might want to use proper logging
+                try:
+                    unit_state = state_store.get_unit_state(unit.id)
+                    unit.status = unit_state.status
+                except Exception:
+                    # Keep original status if state is not available
+                    pass
+            
+            # Re-render unit files with updated state
+            self._write_unit_files(project, project_dir)
+            
+            # Also update TOC to reflect progress
+            self._write_toc_file(project, project_dir)
+            
+        except Exception:
+            # If state sync fails, continue with original project data
             pass
     
     def render_project_files_with_state(
@@ -137,10 +152,8 @@ class MarkdownRenderer:
         progress_callback: Optional[callable] = None
     ) -> None:
         """
-        Render all project files with state.json integration.
-        
-        This is a state-aware version of render_project_files that ensures
-        all rendered content reflects the current state.json data.
+        Render project files with state integration.
+        First syncs the project with current state, then renders all files.
         
         Args:
             project: The learning project to render
@@ -148,34 +161,38 @@ class MarkdownRenderer:
             unit_content_map: Optional mapping of unit IDs to generated content
             progress_callback: Optional callback for progress updates
         """
-        # Initialize state store with project data
-        state_store = self._get_state_store(project_dir)
-        state_store.initialize_from_project(project)
+        # Sync with state before rendering
+        self.sync_with_state(project, project_dir)
         
-        # Use the regular render method (which now uses state-aware content building)
+        # Now render with updated state
         self.render_project_files(project, project_dir, unit_content_map, progress_callback)
     
     def _escape_yaml_value(self, value: Any) -> str:
         """
-        Properly escape a value for YAML frontmatter.
+        Properly escape and quote YAML values when needed.
         
         Args:
-            value: The value to escape (string, int, bool, etc.)
+            value: Value to escape
             
         Returns:
-            YAML-safe string representation
+            Properly escaped YAML string
         """
         if value is None:
             return "null"
         
-        # Convert to string if not already
-        if not isinstance(value, str):
-            value = str(value)
+        value = str(value)
         
-        # Check if the string contains special YAML characters that need quoting
-        special_chars = [':', '"', "'", '\n', '\r', '\t', '[', ']', '{', '}', '|', '>', '#', '&', '*', '!', '%', '@', '`']
+        # Check if the value needs quoting
         needs_quoting = (
-            any(char in value for char in special_chars) or
+            ':' in value or
+            '"' in value or
+            "'" in value or
+            '#' in value or
+            '&' in value or  # Add ampersand to the list
+            '|' in value or  # Add pipe anywhere in string
+            '>' in value or  # Add greater than anywhere in string
+            '\n' in value or  # Add newline check
+            value.startswith(('!', '&', '*', '[', ']', '{', '}', '|', '>', '@', '`')) or
             value.startswith(' ') or
             value.endswith(' ') or
             value.lower() in ['true', 'false', 'null', 'yes', 'no', 'on', 'off'] or
@@ -185,10 +202,9 @@ class MarkdownRenderer:
         
         if needs_quoting:
             # Use ruamel.yaml to properly escape the string
-            from io import StringIO
             yaml = YAML()
-            yaml.preserve_quotes = True
-            yaml.width = 4096
+            yaml.preserve_quotes = DefaultSettings.YAML_PRESERVE_QUOTES
+            yaml.width = DefaultSettings.YAML_LINE_WIDTH
             stream = StringIO()
             yaml.dump(value, stream)
             return stream.getvalue().strip()

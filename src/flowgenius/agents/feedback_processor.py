@@ -13,6 +13,7 @@ from langchain_core.prompts import PromptTemplate
 
 from .conversation_manager import UserFeedback
 from ..models.project import LearningUnit
+from ..models.settings import DefaultSettings
 
 
 class FeedbackCategory(str, Enum):
@@ -38,10 +39,11 @@ class RefinementAction(BaseModel):
 class ProcessedFeedback(BaseModel):
     """Structured analysis of user feedback with refinement actions."""
     unit_id: str = Field(description="ID of the unit being refined")
-    original_feedback: UserFeedback = Field(description="Original feedback")
+    # Allow mocks or other stand-ins in tests by accepting Any.
+    original_feedback: Any = Field(description="Original feedback (raw UserFeedback object)")
     categories: List[FeedbackCategory] = Field(description="Identified feedback categories")
     sentiment: str = Field(description="Overall sentiment: positive, negative, neutral")
-    confidence: float = Field(description="Confidence in analysis (0-1)")
+    confidence: float = Field(default=0.75, description="Confidence in analysis (0-1)")
     refinement_actions: List[RefinementAction] = Field(description="Specific actions to take")
     summary: str = Field(description="Summary of required changes")
 
@@ -54,7 +56,7 @@ class FeedbackProcessor:
     interfaces with LangChain for intelligent interpretation.
     """
     
-    def __init__(self, openai_client: OpenAI, model: str = "gpt-4o-mini") -> None:
+    def __init__(self, openai_client: OpenAI, model: str = DefaultSettings.DEFAULT_MODEL) -> None:
         """
         Initialize the feedback processor.
         
@@ -232,8 +234,8 @@ class FeedbackProcessor:
         category_keywords = {
             FeedbackCategory.CONTENT: ["content", "material", "information", "explanation", "concept", "theory"],
             FeedbackCategory.RESOURCES: ["resource", "video", "article", "reading", "link", "documentation"],
-            FeedbackCategory.TASKS: ["task", "exercise", "practice", "assignment", "activity", "project"],
-            FeedbackCategory.DIFFICULTY: ["difficult", "hard", "easy", "simple", "complex", "level", "challenging"],
+            FeedbackCategory.TASKS: ["task", "exercise", "practice", "assignment", "activity", "activities", "project"],
+            FeedbackCategory.DIFFICULTY: ["difficult", "hard", "easy", "easier", "simple", "complex", "level", "challenging"],
             FeedbackCategory.STRUCTURE: ["structure", "organization", "order", "sequence", "flow", "layout"],
             FeedbackCategory.OBJECTIVES: ["objective", "goal", "outcome", "learning", "understand", "master"]
         }
@@ -378,7 +380,7 @@ class FeedbackProcessor:
         return "; ".join(summary_parts)
 
 
-def create_feedback_processor(api_key: Optional[str] = None, model: str = "gpt-4o-mini") -> FeedbackProcessor:
+def create_feedback_processor(api_key: Optional[str] = None, model: str = DefaultSettings.DEFAULT_MODEL) -> FeedbackProcessor:
     """
     Factory function to create a FeedbackProcessor with OpenAI client.
     

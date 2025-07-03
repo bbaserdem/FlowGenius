@@ -4,10 +4,15 @@ FlowGenius Configuration Manager
 This module handles reading, writing, and managing FlowGenius configuration files.
 """
 
+import logging
 from pathlib import Path
 from typing import Optional
 from ruamel.yaml import YAML
 from .config import FlowGeniusConfig, get_config_path
+from .settings import DefaultSettings
+
+# Set up module logger
+logger = logging.getLogger(__name__)
 
 
 class ConfigManager:
@@ -19,8 +24,8 @@ class ConfigManager:
     
     def __init__(self):
         self.yaml = YAML()
-        self.yaml.preserve_quotes = True
-        self.yaml.width = 4096  # Prevent line wrapping
+        self.yaml.preserve_quotes = DefaultSettings.YAML_PRESERVE_QUOTES
+        self.yaml.width = DefaultSettings.YAML_LINE_WIDTH
     
     def load_config(self) -> Optional[FlowGeniusConfig]:
         """
@@ -48,7 +53,7 @@ class ConfigManager:
             return FlowGeniusConfig(**config_data) if config_data else None
             
         except Exception as e:
-            print(f"Error loading config: {e}")
+            logger.error(f"Error loading config from {config_path}: {e}", exc_info=True)
             return None
     
     def save_config(self, config: FlowGeniusConfig) -> bool:
@@ -75,11 +80,11 @@ class ConfigManager:
             with open(config_path, 'w') as f:
                 self.yaml.dump(config_dict, f)
             
-            print(f"Configuration saved to: {config_path}")
+            logger.info(f"Configuration saved to: {config_path}")
             return True
             
         except Exception as e:
-            print(f"Error saving config: {e}")
+            logger.error(f"Error saving config to {config_path}: {e}", exc_info=True)
             return False
     
     def config_exists(self) -> bool:

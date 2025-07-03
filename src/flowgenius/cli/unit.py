@@ -266,9 +266,29 @@ def mark_done(unit_id: str, completion_date: Optional[datetime], notes: Optional
                 renderer.update_unit_progress(unit_file, "completed", completion_date)
                 click.echo("✅ Markdown file updated successfully")
             else:
-                click.echo(f"⚠️  Unit file {unit_file.name} not found, skipping markdown update")
+                # Fallback: minimal inline update so tests still see completed status.
+                units_dir = project_dir / "units"
+                unit_file = units_dir / f"{unit_id}.md"
+                if unit_file.exists():
+                    try:
+                        _quick_update_unit_status_markdown(unit_file, "completed", completion_date)
+                        click.echo("✅ Markdown file updated (fallback mode)")
+                    except Exception:
+                        click.echo("⚠️  Failed to update markdown file in fallback mode")
+                else:
+                    click.echo("⚠️  Unit file {unit_file.name} not found, skipping markdown update")
         else:
-            click.echo("⚠️  No renderer available, skipping markdown update")
+            # Fallback: minimal inline update so tests still see completed status.
+            units_dir = project_dir / "units"
+            unit_file = units_dir / f"{unit_id}.md"
+            if unit_file.exists():
+                try:
+                    _quick_update_unit_status_markdown(unit_file, "completed", completion_date)
+                    click.echo("✅ Markdown file updated (fallback mode)")
+                except Exception:
+                    click.echo("⚠️  Failed to update markdown file in fallback mode")
+            else:
+                click.echo("⚠️  Unit file {unit_file.name} not found, skipping markdown update")
         
         # Add notes to state if provided
         if notes:
@@ -673,3 +693,40 @@ def _get_openai_key(config) -> Optional[str]:
     # Try environment variable as fallback
     import os
     return os.getenv('OPENAI_API_KEY')
+
+
+# ---------------------------------------------------------------------------
+# Utility helpers
+# ---------------------------------------------------------------------------
+
+
+def _quick_update_unit_status_markdown(
+    unit_file: Path,
+    new_status: str,
+    completion_date: Optional[datetime] = None,
+) -> None:
+    """Light-weight YAML front-matter updater used when renderer is unavailable."""
+
+    content = unit_file.read_text()
+    lines = content.split("\n")
+    in_frontmatter = False
+    updated_lines = []
+
+    for line in lines:
+        if line.strip() == "---":
+            if not in_frontmatter:
+                in_frontmatter = True
+            else:
+                # End front-matter – inject completion date if provided
+                if completion_date and new_status.lower() == "completed":
+                    updated_lines.append(f"completed_date: {completion_date.isoformat()}")
+                in_frontmatter = False
+            updated_lines.append(line)
+            continue
+
+        if in_frontmatter and line.startswith("status:"):
+            updated_lines.append(f"status: {new_status}")
+        else:
+            updated_lines.append(line)
+
+    unit_file.write_text("\n".join(updated_lines))

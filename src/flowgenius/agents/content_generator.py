@@ -7,9 +7,10 @@ combining resource curation and engage task generation for learning units.
 
 from typing import List, Optional, Dict, Any, Tuple
 from openai import OpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..models.project import LearningUnit, LearningResource, EngageTask
+from ..models.settings import DefaultSettings
 from .resource_curator import ResourceCuratorAgent, ResourceRequest
 from .engage_task_generator import EngageTaskGeneratorAgent, TaskGenerationRequest
 
@@ -17,10 +18,10 @@ from .engage_task_generator import EngageTaskGeneratorAgent, TaskGenerationReque
 class ContentGenerationRequest(BaseModel):
     """Request for complete content generation (resources + tasks) for a unit."""
     unit: LearningUnit
-    min_video_resources: int = 1
-    min_reading_resources: int = 1
-    max_total_resources: int = 5
-    num_engage_tasks: int = 1
+    min_video_resources: int = DefaultSettings.MIN_VIDEO_RESOURCES
+    min_reading_resources: int = DefaultSettings.MIN_READING_RESOURCES
+    max_total_resources: int = DefaultSettings.MAX_TOTAL_RESOURCES
+    num_engage_tasks: int = DefaultSettings.DEFAULT_NUM_TASKS
     difficulty_preference: Optional[str] = None
     focus_on_application: bool = True
     use_obsidian_links: bool = True
@@ -28,13 +29,13 @@ class ContentGenerationRequest(BaseModel):
 
 class GeneratedContent(BaseModel):
     """Complete generated content for a learning unit."""
-    unit_id: str
-    resources: List[LearningResource]
-    engage_tasks: List[EngageTask]
-    formatted_resources: List[str]
-    formatted_tasks: List[str]
-    generation_success: bool
-    generation_notes: List[str] = []
+    unit_id: str = Field(description="ID of the unit")
+    resources: List[LearningResource] = Field(default_factory=list)
+    engage_tasks: List[EngageTask] = Field(default_factory=list)
+    formatted_resources: List[str] = Field(default_factory=list)
+    formatted_tasks: List[str] = Field(default_factory=list)
+    generation_success: bool = Field(default=False)
+    generation_notes: List[str] = Field(default_factory=list)
 
 
 class ContentGeneratorAgent:
@@ -46,7 +47,7 @@ class ContentGeneratorAgent:
     EngageTaskGeneratorAgent to provide a complete content generation solution.
     """
     
-    def __init__(self, openai_client: OpenAI, model: str = "gpt-4o-mini") -> None:
+    def __init__(self, openai_client: OpenAI, model: str = DefaultSettings.DEFAULT_MODEL) -> None:
         self.client = openai_client
         self.model = model
         
@@ -243,7 +244,7 @@ class ContentGeneratorAgent:
         )
 
 
-def create_content_generator(api_key: Optional[str] = None, model: str = "gpt-4o-mini") -> ContentGeneratorAgent:
+def create_content_generator(api_key: Optional[str] = None, model: str = DefaultSettings.DEFAULT_MODEL) -> ContentGeneratorAgent:
     """
     Factory function to create a ContentGeneratorAgent with OpenAI client.
     

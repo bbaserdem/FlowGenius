@@ -1,18 +1,19 @@
 """
-FlowGenius Configuration Wizard
+FlowGenius Setup Wizard
 
-This module implements the interactive configuration wizard for FlowGenius.
+This module provides an interactive wizard for setting up FlowGenius
+configuration and creating the first learning project.
 """
 
+import os
+import click
+import questionary
 from pathlib import Path
 from typing import Optional
-import click
-from ..models.config import (
-    FlowGeniusConfig,
-    get_default_projects_root,
-    get_default_openai_key_path
-)
+
+from ..models.config import FlowGeniusConfig, get_config_path, get_default_projects_root
 from ..models.config_manager import ConfigManager
+from ..models.settings import DefaultSettings
 
 
 @click.command()
@@ -23,110 +24,221 @@ from ..models.config_manager import ConfigManager
 )
 def wizard(force: bool) -> None:
     """
-    Interactive configuration wizard for FlowGenius.
+    Interactive setup wizard for FlowGenius.
     
     Guides you through setting up your FlowGenius configuration,
     including API keys, project directories, and preferences.
     """
-    config_manager = ConfigManager()
-    
-    # Check if config already exists
-    if config_manager.config_exists() and not force:
-        if not click.confirm(
-            f"Configuration already exists at {config_manager.get_config_path_str()}. "
-            "Do you want to overwrite it?"
-        ):
-            click.echo("Configuration setup cancelled.")
-            return
-    
-    click.echo("🧙 Welcome to the FlowGenius Configuration Wizard!")
-    click.echo("Let's set up your FlowGenius environment.\n")
-    
-    # Prompt for OpenAI API key path
-    default_key_path = get_default_openai_key_path()
-    openai_key_path = click.prompt(
-        "Path to your OpenAI API key file",
-        default=str(default_key_path),
-        type=click.Path(path_type=Path)
-    )
-    
-    # Validate API key file exists
-    if not openai_key_path.exists():
-        if click.confirm(f"API key file doesn't exist at {openai_key_path}. Continue anyway?"):
-            click.echo(f"⚠️  Remember to create your API key file at {openai_key_path}")
+    if force:
+        # If force flag is used, run the setup wizard without prompting
+        result = run_setup_wizard()
+        if result:
+            click.echo("✅ Setup completed successfully!")
         else:
-            click.echo("Configuration setup cancelled.")
-            return
+            click.echo("❌ Setup was cancelled or failed.")
+    else:
+        # Check if config exists and prompt if needed
+        config_manager = ConfigManager()
+        if config_manager.config_exists():
+            if click.confirm("Configuration already exists. Do you want to overwrite it?"):
+                result = run_setup_wizard()
+                if result:
+                    click.echo("✅ Setup completed successfully!")
+                else:
+                    click.echo("❌ Setup was cancelled or failed.")
+            else:
+                click.echo("Setup cancelled. Using existing configuration.")
+        else:
+            result = run_setup_wizard()
+            if result:
+                click.echo("✅ Setup completed successfully!")
+            else:
+                click.echo("❌ Setup was cancelled or failed.")
+
+
+def run_setup_wizard() -> Optional[FlowGeniusConfig]:
+    """
+    Run the interactive setup wizard for FlowGenius.
     
-    # Prompt for projects root directory
-    default_projects_root = get_default_projects_root()
-    projects_root = click.prompt(
-        "Root directory for your learning projects",
-        default=str(default_projects_root),
-        type=click.Path(path_type=Path)
-    )
+    Returns:
+        FlowGeniusConfig if setup was completed, None if cancelled
+    """
+    print("\n🧙‍♂️ Welcome to FlowGenius Setup Wizard!")
+    print("Let's get you set up with personalized learning projects.\n")
+    
+    # Check if configuration already exists
+    config_path = get_config_path()
+    if config_path.exists():
+        overwrite = questionary.confirm(
+            "Configuration already exists. Do you want to overwrite it?",
+            default=False
+        ).ask()
+        
+        if not overwrite:
+            print("Setup cancelled. Using existing configuration.")
+            return None
+    
+    # OpenAI API Key setup
+    print("📝 First, let's set up your OpenAI API key...")
+    api_key = questionary.password(
+        "Enter your OpenAI API key:",
+        validate=lambda x: len(x.strip()) > 0 or "API key cannot be empty"
+    ).ask()
+    
+    if not api_key:
+        print("Setup cancelled.")
+        return None
+    
+    # Choose model
+    print("\n🤖 Choose your preferred AI model...")
+    model_choice = questionary.select(
+        "Which OpenAI model would you like to use?",
+        choices=[
+            {"name": "GPT-4o Mini (Recommended - Fast & Cost-effective)", "value": "gpt-4o-mini"},
+            {"name": "GPT-4o (Most Capable)", "value": "gpt-4o"},
+            {"name": "GPT-4 Turbo (Balanced)", "value": "gpt-4-turbo"},
+            {"name": "GPT-3.5 Turbo (Budget-friendly)", "value": "gpt-3.5-turbo"}
+        ],
+        default=DefaultSettings.DEFAULT_MODEL,
+        instruction="Use arrow keys to navigate, Enter to select"
+    ).ask()
+    
+    if not model_choice:
+        print("Setup cancelled.")
+        return None
+    
+    # Projects directory setup
+    print("\n📁 Where would you like to store your learning projects?")
+    default_projects = get_default_projects_root()
+    
+    use_default_dir = questionary.confirm(
+        f"Use default directory: {default_projects}?",
+        default=True
+    ).ask()
+    
+    if use_default_dir:
+        projects_root = default_projects
+    else:
+        custom_path = questionary.path(
+            "Enter custom projects directory:",
+            validate=lambda x: Path(x).parent.exists() or "Parent directory must exist"
+        ).ask()
+        
+        if not custom_path:
+            print("Setup cancelled.")
+            return None
+        
+        projects_root = Path(custom_path)
     
     # Create projects directory if it doesn't exist
-    if not projects_root.exists():
-        if click.confirm(f"Create projects directory at {projects_root}?"):
-            try:
-                projects_root.mkdir(parents=True, exist_ok=True)
-                click.echo(f"✅ Created projects directory: {projects_root}")
-            except Exception as e:
-                click.echo(f"❌ Failed to create directory: {e}")
-                return
+    projects_root.mkdir(parents=True, exist_ok=True)
     
-    # Prompt for link style
-    link_style = click.prompt(
-        "Link style for markdown files",
-        default="obsidian",
-        type=click.Choice(['obsidian', 'markdown'], case_sensitive=False)
+    # Content preferences
+    print("\n⚙️ Let's configure your content preferences...")
+    
+    units_per_project = questionary.select(
+        "How many units per project by default?",
+        choices=[
+            {"name": "3 units (Quick overview)", "value": 3},
+            {"name": "5 units (Comprehensive)", "value": 5},
+            {"name": "7 units (Deep dive)", "value": 7}
+        ],
+        default=3
+    ).ask()
+    
+    if units_per_project is None:
+        print("Setup cancelled.")
+        return None
+    
+    focus_application = questionary.confirm(
+        "Focus on practical application in tasks?",
+        default=True
+    ).ask()
+    
+    # Save API key to file
+    key_file = config_path.parent / "openai_key.txt"
+    key_file.parent.mkdir(parents=True, exist_ok=True)
+    key_file.write_text(api_key.strip())
+    key_file.chmod(0o600)  # Secure permissions
+    
+    # Create configuration
+    config = FlowGeniusConfig(
+        openai_key_path=key_file,
+        default_model=model_choice,
+        projects_root=projects_root,
+        auto_create_dirs=True,
+        default_units_per_project=units_per_project,
+        default_unit_duration=DefaultSettings.DEFAULT_UNIT_DURATION,
+        min_video_resources=DefaultSettings.MIN_VIDEO_RESOURCES,
+        min_reading_resources=DefaultSettings.MIN_READING_RESOURCES,
+        max_total_resources=DefaultSettings.MAX_TOTAL_RESOURCES,
+        default_tasks_per_unit=DefaultSettings.DEFAULT_NUM_TASKS,
+        focus_on_application=focus_application,
+        backup_projects=True,
+        file_format="markdown"
     )
-    
-    # Prompt for default model
-    default_model = click.prompt(
-        "Default OpenAI model for content generation",
-        default="gpt-4o-mini",
-        type=str
-    )
-    
-    # Create configuration object
-    try:
-        config = FlowGeniusConfig(
-            openai_key_path=openai_key_path,
-            projects_root=projects_root,
-            link_style=link_style.lower(),
-            default_model=default_model
-        )
-    except Exception as e:
-        click.echo(f"❌ Invalid configuration: {e}")
-        return
     
     # Save configuration
-    if config_manager.save_config(config):
-        click.echo("\n🎉 Configuration saved successfully!")
-        click.echo(f"📁 Config location: {config_manager.get_config_path_str()}")
-        click.echo("\nYou're ready to start using FlowGenius!")
-        click.echo("Try: flowgenius new \"learn Python data structures\"")
+    config_manager = ConfigManager()
+    success = config_manager.save_config(config)
+    
+    if success:
+        print(f"\n✅ Configuration saved successfully!")
+        print(f"📂 Projects will be stored in: {projects_root}")
+        print(f"🤖 Using model: {model_choice}")
+        print(f"🔑 API key saved securely in: {key_file}")
+        
+        # Offer to create first project
+        create_first = questionary.confirm(
+            "\nWould you like to create your first learning project now?",
+            default=True
+        ).ask()
+        
+        if create_first:
+            print("\n🚀 Great! Run 'flowgenius new <topic>' to create your first project.")
+            print("Example: flowgenius new 'Python data science'")
+        
+        return config
     else:
-        click.echo("❌ Failed to save configuration.")
+        print("❌ Failed to save configuration. Please try again.")
+        return None
 
 
-def validate_path_exists(ctx: click.Context, param: click.Parameter, value: str) -> Optional[Path]:
+def validate_openai_key(api_key: str) -> bool:
     """
-    Validate that a given path exists.
+    Validate OpenAI API key format.
     
     Args:
-        ctx: Click context
-        param: Click parameter
-        value: Path value to validate
+        api_key: API key to validate
         
     Returns:
-        Path if valid
-        
-    Raises:
-        click.BadParameter: If path doesn't exist
+        True if key format appears valid
     """
-    if value and not Path(value).exists():
-        raise click.BadParameter(f"Path does not exist: {value}")
-    return Path(value) if value else None 
+    # Basic validation - OpenAI keys start with 'sk-' and are typically 51 chars
+    return (
+        api_key.startswith('sk-') and 
+        len(api_key) >= 20 and
+        all(c.isalnum() or c in '-_' for c in api_key)
+    )
+
+
+def check_existing_config() -> bool:
+    """
+    Check if FlowGenius configuration already exists.
+    
+    Returns:
+        True if configuration exists and is valid
+    """
+    config_manager = ConfigManager()
+    return config_manager.config_exists()
+
+
+def load_existing_config() -> Optional[FlowGeniusConfig]:
+    """
+    Load existing FlowGenius configuration.
+    
+    Returns:
+        FlowGeniusConfig if exists and valid, None otherwise
+    """
+    config_manager = ConfigManager()
+    return config_manager.load_config() 

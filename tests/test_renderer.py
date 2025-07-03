@@ -18,21 +18,33 @@ from flowgenius.agents.content_generator import GeneratedContent
 
 
 @pytest.fixture
-def obsidian_config() -> FlowGeniusConfig:
+def obsidian_config(tmp_path) -> FlowGeniusConfig:
     """Create a config with Obsidian link style."""
+    # Create temporary key file and projects directory
+    key_file = tmp_path / "test_key"
+    key_file.write_text("test-api-key")
+    projects_dir = tmp_path / "projects"
+    projects_dir.mkdir()
+    
     return FlowGeniusConfig(
-        openai_key_path=Path("/tmp/test_key"),
-        projects_root=Path("/tmp/projects"),
+        openai_key_path=key_file,
+        projects_root=projects_dir,
         link_style="obsidian",
         default_model="gpt-4o-mini"
     )
 
 @pytest.fixture
-def markdown_config() -> FlowGeniusConfig:
+def markdown_config(tmp_path) -> FlowGeniusConfig:
     """Create a config with standard markdown link style."""
+    # Create temporary key file and projects directory
+    key_file = tmp_path / "test_key"
+    key_file.write_text("test-api-key")
+    projects_dir = tmp_path / "projects"
+    projects_dir.mkdir()
+    
     return FlowGeniusConfig(
-        openai_key_path=Path("/tmp/test_key"),
-        projects_root=Path("/tmp/projects"),
+        openai_key_path=key_file,
+        projects_root=projects_dir,
         link_style="markdown",
         default_model="gpt-4o-mini"
     )
@@ -472,14 +484,20 @@ class TestLinkStyleHandling:
         
         assert result == "[[units/unit-1.md|C++ & Python: A Comparison]]"
     
-    def test_project_generator_uses_markdown_renderer(self) -> None:
+    def test_project_generator_uses_markdown_renderer(self, tmp_path) -> None:
         """Test that ProjectGenerator properly delegates rendering to MarkdownRenderer."""
         from flowgenius.models.project_generator import ProjectGenerator
         
+        # Create temporary key file and projects directory
+        key_file = tmp_path / "test_key"
+        key_file.write_text("test-api-key")
+        projects_dir = tmp_path / "projects"
+        projects_dir.mkdir()
+        
         # Test that ProjectGenerator has a renderer property that returns MarkdownRenderer
         config = FlowGeniusConfig(
-            openai_key_path=Path("/tmp/test"),
-            projects_root=Path("/tmp/projects"),
+            openai_key_path=key_file,
+            projects_root=projects_dir,
             link_style="obsidian",
             default_model="gpt-4o-mini"
         )
@@ -496,8 +514,8 @@ class TestLinkStyleHandling:
         
         # Test with markdown config too
         markdown_config = FlowGeniusConfig(
-            openai_key_path=Path("/tmp/test"),
-            projects_root=Path("/tmp/projects"),
+            openai_key_path=key_file,
+            projects_root=projects_dir,
             link_style="markdown",
             default_model="gpt-4o-mini"
         )

@@ -6,11 +6,16 @@ active learning tasks for learning units.
 """
 
 import json
+import logging
 from typing import List, Optional, Dict, Any, Tuple
 from openai import OpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from ..models.project import EngageTask, LearningUnit, LearningResource
+from ..models.settings import DefaultSettings, get_task_emoji
+
+# Set up module logger
+logger = logging.getLogger(__name__)
 
 
 class TaskGenerationRequest(BaseModel):
@@ -22,125 +27,189 @@ class TaskGenerationRequest(BaseModel):
     focus_on_application: bool = True
 
 
+class TaskData(BaseModel):
+    """Pydantic model for validating AI-generated task data."""
+    title: str
+    type: str
+    description: str
+    estimated_time: Optional[str] = None
+    difficulty_level: Optional[str] = None
+
+
+class TasksResponse(BaseModel):
+    """Pydantic model for validating complete AI response."""
+    tasks: List[TaskData]
+
+
 class EngageTaskGeneratorAgent:
     """
-    AI agent for generating engaging, active learning tasks for specific learning units.
+    AI agent responsible for generating engaging, active learning tasks.
     
-    Takes a learning unit and its resources to create practical, engaging tasks
-    that promote active learning and skill application.
+    Creates hands-on activities, reflection questions, practice exercises, 
+    and projects that help learners actively engage with the material.
     """
     
-    def __init__(self, openai_client: OpenAI, model: str = "gpt-4o-mini") -> None:
+    def __init__(self, openai_client: OpenAI, model: str = DefaultSettings.DEFAULT_MODEL) -> None:
+        """
+        Initialize the task generator with OpenAI client.
+        
+        Args:
+            openai_client: Configured OpenAI client
+            model: OpenAI model to use for task generation
+        """
         self.client = openai_client
         self.model = model
     
-    def generate_tasks(self, request: TaskGenerationRequest) -> Tuple[List[EngageTask], bool]:
+    def generate_tasks(
+        self,
+        request: TaskGenerationRequest
+    ) -> Tuple[List[EngageTask], bool]:
         """
-        Generate engaging tasks for a specific unit.
+        Generate engaging tasks for a specific learning unit.
         
         Args:
-            request: TaskGenerationRequest with unit and task requirements
+            request: TaskGenerationRequest with unit and generation parameters.
             
         Returns:
-            Tuple of (List of EngageTask objects, success flag indicating if AI generation was used)
+            A tuple containing a list of generated EngageTask objects and a boolean indicating success.
         """
+        unit = request.unit
+        logger.info(f"Generating {request.num_tasks} tasks for unit: {unit.id}")
+        
         try:
-            # Generate tasks using AI
-            tasks = self._generate_tasks_with_ai(request)
+            # Generate tasks using AI with validation
+            tasks_data = self._generate_tasks_with_validation(
+                unit, request.resources, request.num_tasks, request.focus_on_application
+            )
             
-            # Ensure we have at least the requested number of tasks
-            if len(tasks) < request.num_tasks:
-                tasks.extend(self._generate_fallback_tasks(request, request.num_tasks - len(tasks)))
+            if not tasks_data:
+                # Fallback if AI generation returns nothing
+                return self._create_fallback_tasks(unit, request.num_tasks), False
+
+            # Convert to EngageTask objects
+            tasks = []
+            for i, task_data in enumerate(tasks_data):
+                task = EngageTask(
+                    title=task_data.title,
+                    description=task_data.description,
+                    type=task_data.type,
+                    estimated_time=task_data.estimated_time or self._estimate_time_by_type(task_data.type)
+                )
+                tasks.append(task)
             
-            return tasks[:request.num_tasks], True
+            logger.info(f"Successfully generated {len(tasks)} tasks for unit {unit.id}")
+            return tasks, True
             
         except Exception as e:
-            # Fallback to basic tasks if AI fails
-            return self._create_fallback_tasks(request), False
+            logger.error(f"Failed to generate tasks for unit {unit.id}: {e}", exc_info=True)
+            # Return fallback tasks
+            return self._create_fallback_tasks(unit, request.num_tasks), False
     
-    def generate_tasks_legacy(self, request: TaskGenerationRequest) -> List[EngageTask]:
+    def _generate_tasks_with_validation(
+        self,
+        unit: LearningUnit,
+        resources: Optional[List[LearningResource]],
+        num_tasks: int,
+        focus_on_application: bool
+    ) -> List[TaskData]:
         """
-        Legacy method that returns only tasks for backward compatibility.
+        Generate tasks using OpenAI API with proper JSON validation.
+        
+        Args:
+            unit: Learning unit to generate tasks for
+            resources: Optional list of resources for context
+            num_tasks: Number of tasks to generate
+            focus_on_application: Whether to focus on practical application
+            
+        Returns:
+            List of validated TaskData objects
         """
-        tasks, _ = self.generate_tasks(request)
-        return tasks
-    
-    def _generate_tasks_with_ai(self, request: TaskGenerationRequest) -> List[EngageTask]:
-        """
-        Use AI to generate appropriate engaging tasks for the unit.
-        """
-        system_prompt = self._build_system_prompt()
-        user_prompt = self._build_user_prompt(request)
+        prompt = self._build_task_prompt(unit, resources, num_tasks, focus_on_application)
         
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.8,  # Higher creativity for task generation
-            max_tokens=1500
-        )
-        
-        # Parse the response
-        content = response.choices[0].message.content
-        tasks_data = json.loads(content)
-        
-        # Convert to EngageTask objects
-        tasks = []
-        for task_data in tasks_data["tasks"]:
-            task = EngageTask(
-                title=task_data["title"],
-                description=task_data["description"],
-                type=task_data["type"],
-                estimated_time=task_data.get("estimated_time")
-            )
-            tasks.append(task)
-        
-        return tasks
-    
-    def _build_system_prompt(self) -> str:
-        """Build the system prompt for the AI."""
-        return """You are an expert learning designer who creates engaging, active learning tasks.
-
-Your job is to design specific learning activities that:
-1. Promote active engagement with the material (not passive consumption)
-2. Help learners apply concepts practically
-3. Encourage reflection and deeper thinking
-4. Are achievable within a reasonable timeframe
-5. Connect to real-world applications
-
-Return your response as valid JSON with this exact structure:
+        # Add JSON schema to the prompt
+        json_schema = """
 {
-  "tasks": [
-    {
-      "title": "Clear, action-oriented task title",
-      "description": "Detailed description of what the learner should do, including specific steps or guidelines",
-      "type": "reflection|practice|project|quiz|experiment",
-      "estimated_time": "15 min|1 hour|etc"
-    }
-  ]
-}
-
-Task Types Guidelines:
-- "reflection": Thoughtful analysis, self-assessment, or deep thinking exercises
-- "practice": Hands-on exercises, drills, or skill application
-- "project": Creative application, building something, or synthesis activities
-- "quiz": Self-testing, knowledge verification, or quick assessments
-- "experiment": Try something new, test hypotheses, or explore variations
-
-Design Principles:
-- Make tasks specific and actionable
-- Include concrete deliverables when appropriate
-- Encourage personal application and context
-- Balance challenge with achievability
-- Promote different learning styles
-- Focus on active learning over passive consumption"""
-
-    def _build_user_prompt(self, request: TaskGenerationRequest) -> str:
-        """Build the user prompt with the specific unit information."""
-        unit = request.unit
+    "tasks": [
+        {
+            "title": "Task Title",
+            "type": "reflection|practice|project|quiz|experiment",
+            "description": "What the learner should do - include any step-by-step instructions here",
+            "estimated_time": "15-30 min"
+        }
+    ]
+}"""
         
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an expert instructional designer who creates engaging, hands-on learning activities. Focus on active learning and practical application. Always respond with valid JSON."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"{prompt}\n\nExpected JSON format:\n{json_schema}"
+                    }
+                ],
+                temperature=DefaultSettings.TASK_GENERATION_TEMPERATURE,
+                max_tokens=DefaultSettings.TASK_GENERATION_MAX_TOKENS,
+                response_format={"type": "json_object"}  # Force JSON response
+            )
+            
+            content = response.choices[0].message.content
+            
+            # Check for None or empty content
+            if not content:
+                logger.error("AI returned empty content")
+                return []
+                
+            content = content.strip()
+            logger.debug(f"AI response content: {content[:200]}...")
+            
+            # Parse and validate JSON response
+            try:
+                tasks_json = json.loads(content)
+                logger.debug(f"Parsed JSON structure: {type(tasks_json)}")
+                
+                # Validate with Pydantic
+                validated_response = TasksResponse(**tasks_json)
+                logger.info(f"Successfully validated {len(validated_response.tasks)} tasks")
+                return validated_response.tasks
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON parsing failed: {e}")
+                logger.debug(f"Full AI response: {content}")
+                raise
+            except ValidationError as e:
+                logger.error(f"Pydantic validation failed: {e}")
+                logger.debug(f"Full AI response: {content}")
+                raise
+                
+        except Exception as e:
+            logger.error(f"Failed to generate tasks: {e}", exc_info=True)
+            # Return empty list to trigger fallback
+            return []
+    
+    def _build_task_prompt(
+        self,
+        unit: LearningUnit,
+        resources: Optional[List[LearningResource]],
+        num_tasks: int,
+        focus_on_application: bool
+    ) -> str:
+        """
+        Build the prompt for generating tasks using OpenAI API.
+        
+        Args:
+            unit: Learning unit to generate tasks for
+            resources: Optional list of resources for context
+            num_tasks: Number of tasks to generate
+            focus_on_application: Whether to focus on practical application
+            
+        Returns:
+            Prompt string for generating tasks
+        """
         prompt = f"""Create engaging learning tasks for this unit:
 
 Unit Title: {unit.title}
@@ -154,66 +223,43 @@ Learning Objectives:
             prompt += f"\nEstimated Unit Duration: {unit.estimated_duration}"
         
         # Include resources if available
-        if request.resources:
+        if resources:
             prompt += "\n\nAvailable Resources:"
-            for resource in request.resources:
+            for resource in resources:
                 prompt += f"\n- {resource.title} ({resource.type}): {resource.description or 'No description'}"
         
         prompt += f"""
 
 Requirements:
-- Generate {request.num_tasks} engaging task(s)
+- Generate {num_tasks} engaging task(s)
 - Focus on active learning and practical application
 """
         
-        if request.difficulty_preference:
-            prompt += f"- Difficulty level: {request.difficulty_preference}"
-            
-        if request.focus_on_application:
+        if focus_on_application:
             prompt += "\n- Emphasize real-world application and hands-on practice"
         
         prompt += "\n\nReturn valid JSON following the specified structure."
         
         return prompt
     
-    def _generate_fallback_tasks(self, request: TaskGenerationRequest, count: int) -> List[EngageTask]:
-        """Generate fallback tasks if AI didn't provide enough."""
-        fallback_tasks = []
-        unit = request.unit
+    def _estimate_time_by_type(self, task_type: str) -> str:
+        """
+        Estimate task time based on task type.
         
-        task_templates = [
-            {
-                "title": f"Reflect on {unit.title} Applications",
-                "description": f"Think about how {unit.title} applies to your personal goals or interests. Write down 3 specific ways you could use these concepts.",
-                "type": "reflection",
-                "estimated_time": "10 min"
-            },
-            {
-                "title": f"Practice {unit.title} Skills",
-                "description": f"Complete a hands-on exercise related to {unit.title}. Apply the key concepts from the learning objectives.",
-                "type": "practice", 
-                "estimated_time": "20-30 min"
-            },
-            {
-                "title": f"Create a {unit.title} Project",
-                "description": f"Design a small project that demonstrates your understanding of {unit.title}. Focus on practical application.",
-                "type": "project",
-                "estimated_time": "45 min"
-            }
-        ]
-        
-        for i in range(count):
-            template = task_templates[i % len(task_templates)]
-            task = EngageTask(**template)
-            fallback_tasks.append(task)
-        
-        return fallback_tasks
+        Args:
+            task_type: Type of task
+            
+        Returns:
+            Estimated time for the task
+        """
+        # Implement time estimation logic based on task type
+        # This is a placeholder and should be replaced with actual implementation
+        return "15 min"
     
-    def _create_fallback_tasks(self, request: TaskGenerationRequest) -> List[EngageTask]:
+    def _create_fallback_tasks(self, unit: LearningUnit, num_tasks: int) -> List[EngageTask]:
         """
         Create basic fallback tasks if AI generation completely fails.
         """
-        unit = request.unit
         topic = unit.title
         
         tasks = []
@@ -228,7 +274,7 @@ Requirements:
         tasks.append(reflection_task)
         
         # Add practice task if more tasks needed
-        if request.num_tasks > 1:
+        if num_tasks > 1:
             practice_task = EngageTask(
                 title=f"Practice {topic} Concepts",
                 description=f"Complete a practical exercise that applies the key concepts from {topic}. Focus on hands-on application rather than theoretical knowledge.",
@@ -237,7 +283,7 @@ Requirements:
             )
             tasks.append(practice_task)
         
-        return tasks[:request.num_tasks]
+        return tasks[:num_tasks]
 
 
 def format_tasks_for_markdown(tasks: List[EngageTask]) -> List[str]:
