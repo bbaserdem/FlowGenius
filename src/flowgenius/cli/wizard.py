@@ -78,15 +78,72 @@ def run_setup_wizard() -> Optional[FlowGeniusConfig]:
             print("Setup cancelled. Using existing configuration.")
             return None
     
-    # OpenAI API Key setup
-    print("📝 First, let's set up your OpenAI API key...")
-    api_key = questionary.password(
-        "Enter your OpenAI API key:",
-        validate=lambda x: len(x.strip()) > 0 or "API key cannot be empty"
-    ).ask()
+    # OpenAI API Key file path setup
+    print("📝 First, let's set up your OpenAI API key file path...")
+    print("💡 Tip: Store your API key in a file like ~/.secrets/openai_api_key or ~/.openai_api_key")
+    print("   Make sure the file has restrictive permissions (chmod 600)\n")
     
-    if not api_key:
+    # Suggest default paths
+    default_paths = [
+        Path.home() / ".secrets" / "openai_api_key",
+        Path.home() / ".openai_api_key",
+        get_config_dir() / "openai_key.txt"
+    ]
+    
+    existing_paths = [p for p in default_paths if p.exists()]
+    
+    if existing_paths:
+        # Found existing API key files
+        choices = [{"name": str(p), "value": str(p)} for p in existing_paths]
+        choices.append({"name": "Enter custom path", "value": "custom"})
+        
+        api_key_path_choice = questionary.select(
+            "Found existing API key file(s). Select one:",
+            choices=choices
+        ).ask()
+        
+        if not api_key_path_choice:
+            print("Setup cancelled.")
+            return None
+            
+        if api_key_path_choice == "custom":
+            api_key_path = questionary.path(
+                "Enter the path to your OpenAI API key file:",
+                validate=validate_api_key_file
+            ).ask()
+        else:
+            api_key_path = api_key_path_choice
+    else:
+        # No existing files found, ask for path
+        api_key_path = questionary.path(
+            "Enter the path to your OpenAI API key file:",
+            validate=validate_api_key_file
+        ).ask()
+    
+    if not api_key_path:
         print("Setup cancelled.")
+        return None
+    
+    api_key_path = Path(api_key_path).expanduser()
+    
+    # Validate the API key in the file
+    try:
+        api_key_content = api_key_path.read_text().strip()
+        if not validate_openai_key(api_key_content):
+            print(f"❌ Invalid API key format in {api_key_path}")
+            create_new = questionary.confirm(
+                "Would you like to create a new API key file?",
+                default=True
+            ).ask()
+            
+            if create_new:
+                api_key_path = create_api_key_file()
+                if not api_key_path:
+                    return None
+            else:
+                return None
+    except Exception as e:
+        print(f"❌ Error reading API key file: {e}")
         return None
     
     # Choose model
@@ -155,16 +212,9 @@ def run_setup_wizard() -> Optional[FlowGeniusConfig]:
         default=True
     ).ask()
     
-    # Save API key to file in XDG config directory
-    config_dir = get_config_dir()
-    config_dir.mkdir(parents=True, exist_ok=True)
-    key_file = config_dir / "openai_key.txt"
-    key_file.write_text(api_key.strip())
-    key_file.chmod(0o600)
-    
     # Create configuration
     config = FlowGeniusConfig(
-        openai_key_path=key_file,
+        openai_key_path=api_key_path,
         default_model=model_choice,
         projects_root=projects_root,
         auto_create_dirs=True,
@@ -187,7 +237,7 @@ def run_setup_wizard() -> Optional[FlowGeniusConfig]:
         print(f"\n✅ Configuration saved successfully!")
         print(f"📂 Projects will be stored in: {projects_root}")
         print(f"🤖 Using model: {model_choice}")
-        print(f"🔑 API key saved securely in: {key_file}")
+        print(f"🔑 API key file: {api_key_path}")
         
         # Offer to create first project
         create_first = questionary.confirm(
@@ -203,6 +253,78 @@ def run_setup_wizard() -> Optional[FlowGeniusConfig]:
     else:
         print("❌ Failed to save configuration. Please try again.")
         return None
+
+
+def create_api_key_file() -> Optional[Path]:
+    """
+    Create a new API key file with proper permissions.
+    
+    Returns:
+        Path to the created file, or None if cancelled
+    """
+    print("\n🔑 Let's create a new API key file...")
+    
+    # Ask for file location
+    default_path = get_config_dir() / "openai_key.txt"
+    file_path = questionary.path(
+        f"Where to save the API key file? (default: {default_path}):",
+        default=str(default_path)
+    ).ask()
+    
+    if not file_path:
+        return None
+    
+    file_path = Path(file_path).expanduser()
+    
+    # Ask for API key
+    api_key = questionary.password(
+        "Enter your OpenAI API key:",
+        validate=lambda x: validate_openai_key(x.strip()) or "Invalid API key format. Should start with 'sk-'"
+    ).ask()
+    
+    if not api_key:
+        return None
+    
+    # Create directory if needed
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Save API key with restrictive permissions
+    file_path.write_text(api_key.strip())
+    file_path.chmod(0o600)
+    
+    print(f"✅ API key saved to: {file_path}")
+    print(f"🔒 File permissions set to 600 (owner read/write only)")
+    
+    return file_path
+
+
+def validate_api_key_file(path: str) -> bool:
+    """
+    Validate that the API key file exists and is readable.
+    
+    Args:
+        path: Path to the API key file
+        
+    Returns:
+        True if valid, or error message if not
+    """
+    try:
+        p = Path(path).expanduser()
+        if not p.exists():
+            return f"File does not exist: {path}"
+        if not p.is_file():
+            return f"Not a file: {path}"
+        if not os.access(p, os.R_OK):
+            return f"File is not readable: {path}"
+        
+        # Check file permissions (warn if too permissive)
+        mode = p.stat().st_mode & 0o777
+        if mode != 0o600:
+            print(f"⚠️  Warning: File permissions are {oct(mode)}. Consider running: chmod 600 {path}")
+        
+        return True
+    except Exception as e:
+        return f"Error: {e}"
 
 
 def validate_openai_key(api_key: str) -> bool:
