@@ -7,7 +7,7 @@ including user preferences, API settings, and project defaults.
 
 from pathlib import Path
 from typing import Optional, Literal
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from platformdirs import user_config_dir, user_documents_dir
 from .settings import DefaultSettings
 
@@ -58,10 +58,10 @@ class FlowGeniusConfig(BaseModel):
     # Link Style
     link_style: Literal["obsidian", "markdown"] = "obsidian"
     
-    class Config:
-        """Pydantic configuration."""
-        validate_assignment = True
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True
+    )
 
     @field_validator('openai_key_path', 'projects_root')
     @classmethod

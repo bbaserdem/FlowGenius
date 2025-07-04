@@ -2,7 +2,7 @@
 FlowGenius Conversation Manager
 
 This module provides conversation management for handling user feedback
-during the unit refinement process using LangChain for memory management.
+during the unit refinement process using LangChain for message management.
 """
 
 from typing import Dict, List, Optional, Any, Tuple, Callable
@@ -11,8 +11,7 @@ import logging
 import re
 import os
 
-from langchain.memory import ConversationBufferMemory
-from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage, trim_messages
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
 
@@ -23,11 +22,11 @@ logger = logging.getLogger(__name__)
 
 
 class ConversationSession:
-    """Represents an active conversation session with LangChain memory."""
+    """Represents an active conversation session with message history."""
     
     def __init__(self, session_id: str, unit_id: str, unit: LearningUnit) -> None:
         """
-        Initialize a conversation session with LangChain memory.
+        Initialize a conversation session with message history.
         
         Args:
             session_id: Unique session identifier
@@ -40,12 +39,8 @@ class ConversationSession:
         self.created_at = get_timestamp()
         self.feedback_history: List[UserFeedback] = []
         
-        # Initialize LangChain ConversationBufferMemory
-        self.memory = ConversationBufferMemory(
-            memory_key="chat_history",
-            return_messages=True,
-            output_key="output"
-        )
+        # Store conversation messages directly instead of using deprecated ConversationBufferMemory
+        self.messages: List[BaseMessage] = []
 
 
 class ConversationManager:
@@ -53,7 +48,7 @@ class ConversationManager:
     Manages conversation sessions with learners using LangChain.
     
     This class handles the creation and management of refinement sessions,
-    processes user feedback using LangChain memory, and generates appropriate responses.
+    processes user feedback using LangChain messages, and generates appropriate responses.
     """
     
     def __init__(self, openai_client=None, model: str = "gpt-4o-mini", timestamp_provider: Optional[Callable[[], str]] = None) -> None:
@@ -106,7 +101,7 @@ class ConversationManager:
         session_uuid = uuid.uuid4().hex
         session_id = f"refine_{unit.id}_{session_uuid}"
         
-        # Create a new session with LangChain memory
+        # Create a new session with message history
         session = ConversationSession(session_id, unit.id, unit)
         self.active_sessions[session_id] = session
         
@@ -115,7 +110,7 @@ class ConversationManager:
     
     def process_user_feedback(self, session_id: str, feedback_text: str) -> Tuple[str, UserFeedback]:
         """
-        Process user feedback from a session using LangChain memory.
+        Process user feedback from a session using LangChain messages.
         
         Args:
             session_id: Session identifier
@@ -160,17 +155,15 @@ class ConversationManager:
         # Store feedback in session history
         session.feedback_history.append(feedback)
         
-        # Update LangChain memory
-        session.memory.save_context(
-            {"input": feedback_text},
-            {"output": response}
-        )
+        # Update message history
+        session.messages.append(HumanMessage(content=feedback_text))
+        session.messages.append(AIMessage(content=response))
         
         return response, feedback
     
     def _generate_langchain_response(self, session: ConversationSession, input_text: str) -> str:
         """
-        Generate a response using LangChain with conversation memory.
+        Generate a response using LangChain with conversation history.
         
         Args:
             session: The conversation session
@@ -184,16 +177,23 @@ class ConversationManager:
             return self._generate_fallback_response(input_text)
         
         try:
-            # Get conversation history from memory
-            memory_variables = session.memory.load_memory_variables({})
-            chat_history = memory_variables.get("chat_history", [])
+            # Trim messages to keep only recent context (max 10 messages)
+            trimmed_messages = trim_messages(
+                session.messages,
+                token_counter=len,  # Simple message count
+                max_tokens=10,  # Keep last 10 messages
+                strategy="last",
+                start_on="human",
+                include_system=True,
+                allow_partial=False
+            )
             
             # Create a simple chain with the chat model
             chain = self.prompt_template | self.chat_model
             
             # Invoke the chain with the input and chat history
             response = chain.invoke({
-                "chat_history": chat_history,
+                "chat_history": trimmed_messages,
                 "input": input_text
             })
             
@@ -337,14 +337,13 @@ class ConversationManager:
         if not session:
             return None
         
-        # Return session info including memory state
-        memory_vars = session.memory.load_memory_variables({})
+        # Return session info including message count
         return {
             "session_id": session.session_id,
             "unit_id": session.unit_id,
             "created_at": session.created_at,
             "feedback_count": len(session.feedback_history),
-            "memory_messages": len(memory_vars.get("chat_history", []))
+            "message_count": len(session.messages)
         }
     
     def end_session(self, session_id: str) -> bool:
@@ -358,9 +357,9 @@ class ConversationManager:
             True if session was ended, False if not found
         """
         if session_id in self.active_sessions:
-            # Clear memory before deletion
+            # Clear messages before deletion
             session = self.active_sessions[session_id]
-            session.memory.clear()
+            session.messages.clear()
             
             del self.active_sessions[session_id]
             logger.info(f"Ended session {session_id}")

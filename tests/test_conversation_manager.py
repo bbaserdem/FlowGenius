@@ -75,8 +75,8 @@ class TestConversationManager:
                 
                 assert session_id.startswith("refine_unit-1_")
                 assert session_id in manager.active_sessions
-                # Check that the session has LangChain memory
-                assert hasattr(manager.active_sessions[session_id], 'memory')
+                # Check that the session has message history
+                assert hasattr(manager.active_sessions[session_id], 'messages')
 
     def test_process_user_feedback_basic(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test basic feedback processing."""
