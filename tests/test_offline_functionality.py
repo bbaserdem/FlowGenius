@@ -233,8 +233,13 @@ class TestOfflineFunctionality:
         
         # Mock the scaffolder to raise network error
         mock_scaffolder = Mock()
-        mock_scaffolder.scaffold_topic.side_effect = Exception("Network error: Unable to connect")
+        mock_scaffolder.create_learning_project.side_effect = Exception("Network error: Unable to connect")
         generator._scaffolder = mock_scaffolder
+        
+        # Mock the orchestrator to prevent it from being initialized
+        mock_orchestrator = Mock()
+        mock_orchestrator.orchestrate_content_generation.side_effect = Exception("Network error: Unable to connect")
+        generator._orchestrator = mock_orchestrator
         
         # This should raise an error since it requires network
         with pytest.raises(Exception) as exc_info:

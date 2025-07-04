@@ -20,6 +20,11 @@ from .content_generator import (
     create_content_generator,
     generate_unit_content_simple
 )
+from .project_content_orchestrator import (
+    ProjectContentOrchestrator,
+    OrchestrationResult,
+    create_project_orchestrator
+)
 
 __all__ = [
     "TopicScaffolderAgent",
@@ -35,5 +40,8 @@ __all__ = [
     "ContentGenerationRequest",
     "GeneratedContent",
     "create_content_generator",
-    "generate_unit_content_simple"
+    "generate_unit_content_simple",
+    "ProjectContentOrchestrator",
+    "OrchestrationResult",
+    "create_project_orchestrator"
 ] 

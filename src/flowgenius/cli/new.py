@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     '--units',
+    prompt='How many learning units would you like?',
     default=3,
     type=int,
     help='Number of learning units to generate (default: 3)'

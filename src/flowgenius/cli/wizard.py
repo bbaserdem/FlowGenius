@@ -156,7 +156,6 @@ def run_setup_wizard() -> Optional[FlowGeniusConfig]:
             {"name": "GPT-4 Turbo (Balanced)", "value": "gpt-4-turbo"},
             {"name": "GPT-3.5 Turbo (Budget-friendly)", "value": "gpt-3.5-turbo"}
         ],
-        default=DefaultSettings.DEFAULT_MODEL,
         instruction="Use arrow keys to navigate, Enter to select"
     ).ask()
     
@@ -199,8 +198,7 @@ def run_setup_wizard() -> Optional[FlowGeniusConfig]:
             {"name": "3 units (Quick overview)", "value": 3},
             {"name": "5 units (Comprehensive)", "value": 5},
             {"name": "7 units (Deep dive)", "value": 7}
-        ],
-        default=3
+        ]
     ).ask()
     
     if units_per_project is None:
@@ -246,8 +244,10 @@ def run_setup_wizard() -> Optional[FlowGeniusConfig]:
         ).ask()
         
         if create_first:
-            print("\n🚀 Great! Run 'flowgenius new <topic>' to create your first project.")
-            print("Example: flowgenius new 'Python data science'")
+            print("\n🚀 Great! You can create your first project in two ways:")
+            print("  Interactive: flowgenius new")
+            print("  Direct: flowgenius create 'Python data science'")
+            print("\nExample: flowgenius create 'Python data science' --motivation='Get a data science job'")
         
         return config
     else:

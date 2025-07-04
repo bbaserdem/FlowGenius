@@ -28,8 +28,11 @@ pip --user install flowgenius
 # Configure your environment
 flowgenius wizard
 
-# Create your first learning project
-flowgenius new "Learn NixOS"
+# Create your first learning project (interactive)
+flowgenius new
+
+# Or create directly with topic
+flowgenius create "Learn NixOS"
 ```
 
 ## Usage
@@ -38,12 +41,15 @@ flowgenius new "Learn NixOS"
 # Interactive configuration wizard
 flowgenius wizard
 
-# Create a new learning project
-flowgenius new "learn Python data structures"
-flowgenius new "understand quantum computing basics"
+# Create a new learning project interactively
+flowgenius new
 
-# Start with a specific motivation
-flowgenius new "learn Rust programming" --why "build fast CLI tools"
+# Create a new learning project directly
+flowgenius create "learn Python data structures"
+flowgenius create "understand quantum computing basics"
+
+# Create with a specific motivation
+flowgenius create "learn Rust programming" --motivation "build fast CLI tools"
 
 # List your projects
 flowgenius list

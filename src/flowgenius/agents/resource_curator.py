@@ -143,10 +143,10 @@ class ResourceCuratorAgent:
 {
     "resources": [
         {
-            "title": "Resource Title",
-            "url": "https://example.com",
+            "title": "Search for: [Specific Topic] Tutorial",
+            "url": "https://youtube.com/results?search_query=specific+topic+tutorial+beginner",
             "type": "video|article|paper|documentation|tutorial",
-            "description": "Brief description of the resource",
+            "description": "Search for beginner-friendly video tutorials on [specific topic]",
             "estimated_time": "15-20 min"
         }
     ]
@@ -158,7 +158,7 @@ class ResourceCuratorAgent:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an expert resource curator who finds the best learning materials for educational content. Focus on reputable, high-quality sources. Always respond with valid JSON."
+                        "content": "You are an expert learning resource curator who helps learners discover the best materials. Since you cannot browse the web, you create specific, actionable search queries that learners can use to find high-quality resources. Focus on reputable sources and specific search terms. Always respond with valid JSON."
                     },
                     {
                         "role": "user",
@@ -220,7 +220,7 @@ class ResourceCuratorAgent:
         Returns:
             Prompt string for OpenAI API
         """
-        prompt = f"""Find learning resources for this unit:
+        prompt = f"""Create search queries to help learners find resources for this unit:
 
 Unit Title: {unit.title}
 Description: {unit.description}
@@ -238,6 +238,18 @@ Requirements:
 - At least {min_video_resources} video resource(s)
 - At least {min_reading_resources} reading resource(s) (articles/papers/documentation)
 - Maximum {max_total_resources} total resources
+
+IMPORTANT: Since we cannot access the web directly, generate SEARCH QUERIES that users can use:
+- For videos: Create YouTube search URLs with relevant search terms
+- For articles: Create Google search URLs with relevant search terms
+- For documentation: Create search URLs for official docs or Google searches
+
+Format URLs as actual search links:
+- YouTube: https://youtube.com/results?search_query=YOUR+SEARCH+TERMS+HERE
+- Google: https://google.com/search?q=YOUR+SEARCH+TERMS+HERE
+- Documentation: https://google.com/search?q=TOPIC+official+documentation
+
+Make the search queries specific and relevant to the learning objectives.
 """
         
         prompt += "\n\nReturn valid JSON following the specified structure."
@@ -446,12 +458,18 @@ def format_resources_for_obsidian(resources: List[LearningResource], use_obsidia
     formatted = []
     
     for resource in resources:
+        # Prepend "Search: " if the URL is a search query
+        title = resource.title
+        if "search_query=" in resource.url or "search?q=" in resource.url:
+            if not title.startswith("Search"):
+                title = f"Search: {title}"
+        
         if use_obsidian_links:
             # Obsidian-style external link: [title](url)
-            link = f"[{resource.title}]({resource.url})"
+            link = f"[{title}]({resource.url})"
         else:
             # Standard markdown link
-            link = f"[{resource.title}]({resource.url})"
+            link = f"[{title}]({resource.url})"
         
         # Add type emoji for visual distinction
         emoji = get_resource_emoji(resource.type)

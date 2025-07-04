@@ -82,13 +82,16 @@ class TopicScaffolderAgent:
         logger.info(f"Creating learning project for topic: {topic}")
         
         try:
+            # Generate project ID first
+            project_id = generate_project_id(topic)
+            
             # Generate learning units using AI
             units_data = self._generate_learning_units(topic, motivation, target_units)
             
             # Create learning units from the generated data
             units = []
             for i, unit_data in enumerate(units_data):
-                unit_id = generate_unit_id(i + 1)
+                unit_id = generate_unit_id(project_id, i)
                 
                 unit = LearningUnit(
                     id=unit_id,
@@ -103,6 +106,8 @@ class TopicScaffolderAgent:
             
             # Create project metadata
             metadata = ProjectMetadata(
+                id=project_id,
+                title=f"Learning {topic}",
                 topic=topic,
                 motivation=motivation,
                 estimated_total_time=estimated_total_time or self._estimate_total_time(units)
@@ -110,8 +115,6 @@ class TopicScaffolderAgent:
             
             # Create and return the complete project
             project = LearningProject(
-                project_id=generate_project_id(),
-                title=f"Learning {topic}",
                 metadata=metadata,
                 units=units
             )
@@ -192,9 +195,37 @@ class TopicScaffolderAgent:
         if motivation:
             prompt += f"\n\nLearner's motivation: {motivation}"
         
-        prompt += f"\n\nGenerate {target_units} learning units."
+        prompt += f"\n\nGenerate {target_units} learning units that build progressively upon each other."
         
-        prompt += "\n\nRemember to return valid JSON following the specified structure."
+        prompt += """
+
+Return your response as valid JSON in this exact format:
+{
+  "units": [
+    {
+      "title": "Unit title",
+      "description": "What this unit covers",
+      "learning_objectives": [
+        "First objective",
+        "Second objective",
+        "Third objective"
+      ],
+      "estimated_duration": "1-2 hours",
+      "prerequisites": [],
+      "status": "pending"
+    }
+  ]
+}
+
+Each unit should have:
+- A clear, descriptive title
+- A comprehensive description
+- 3-5 specific learning objectives
+- Realistic time estimates
+- Prerequisites (use unit IDs like "unit-1", "unit-2" for later units)
+- Status should always be "pending"
+
+Make sure prerequisites reference earlier units correctly (e.g., unit-2 requires unit-1)."""
         
         return prompt
     
@@ -204,17 +235,27 @@ class TopicScaffolderAgent:
         """
         logger.warning(f"Creating fallback project for topic: {topic}")
         
+        # Generate project ID
+        project_id = generate_project_id(topic)
+        
         # Reuse the fallback units generation
-        units = self._create_fallback_units(topic, target_units)
+        units = []
+        for i, unit in enumerate(self._create_fallback_units(topic, target_units)):
+            # Update unit ID to use proper format
+            unit.id = generate_unit_id(project_id, i)
+            units.append(unit)
+        
+        # Create metadata
+        metadata = ProjectMetadata(
+            id=project_id,
+            title=f"Learning {topic}",
+            topic=topic,
+            motivation=motivation,
+            estimated_total_time=self._estimate_total_time(units)
+        )
         
         return LearningProject(
-            project_id=generate_project_id(),
-            title=f"Learning {topic}",
-            metadata=ProjectMetadata(
-                topic=topic,
-                motivation=motivation,
-                estimated_total_time=self._estimate_total_time(units)
-            ),
+            metadata=metadata,
             units=units
         )
     
