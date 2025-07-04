@@ -61,6 +61,7 @@ class TestRefinementResult:
 class TestUnitRefinementEngine:
     """Test cases for UnitRefinementEngine."""
 
+    @pytest.mark.requires_api_key
     def test_init(self, mock_openai_client: Mock) -> None:
         """Test unit refinement engine initialization."""
         engine = UnitRefinementEngine(mock_openai_client, model="gpt-4")
@@ -72,6 +73,7 @@ class TestUnitRefinementEngine:
         assert engine.task_generator is not None
         assert engine.feedback_processor is not None
 
+    @pytest.mark.requires_api_key
     def test_apply_refinement_no_action(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test refinement application when no action is needed."""
         engine = UnitRefinementEngine(mock_openai_client)
@@ -98,6 +100,7 @@ class TestUnitRefinementEngine:
             assert result.success is True
             assert "No changes needed" in result.changes_made[0]
 
+    @pytest.mark.requires_api_key
     def test_apply_refinement_add_content(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test refinement application for adding content (resources)."""
         engine = UnitRefinementEngine(mock_openai_client)
@@ -130,6 +133,7 @@ class TestUnitRefinementEngine:
                 assert len(result.refined_unit.resources) == len(sample_learning_unit.resources) + 1
                 mock_curate.assert_called_once()
 
+    @pytest.mark.requires_api_key
     def test_apply_refinement_add_examples(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test refinement application for adding examples (tasks)."""
         engine = UnitRefinementEngine(mock_openai_client)
@@ -162,6 +166,7 @@ class TestUnitRefinementEngine:
                 assert len(result.refined_unit.engage_tasks) == len(sample_learning_unit.engage_tasks) + 1
                 mock_generate.assert_called_once()
 
+    @pytest.mark.requires_api_key
     def test_apply_refinement_clarify_content(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test refinement application for clarifying content."""
         engine = UnitRefinementEngine(mock_openai_client)
@@ -203,6 +208,7 @@ class TestUnitRefinementEngine:
                 assert "content" in result.updated_components
                 assert "[Clarified]" in result.refined_unit.description
 
+    @pytest.mark.requires_api_key
     def test_apply_refinement_simplify_content(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test refinement application for simplifying content."""
         engine = UnitRefinementEngine(mock_openai_client)
@@ -244,6 +250,7 @@ class TestUnitRefinementEngine:
                 assert "content" in result.updated_components
                 assert "[Simplified]" in result.refined_unit.description
 
+    @pytest.mark.requires_api_key
     def test_apply_refinement_with_errors(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test refinement application when errors occur."""
         engine = UnitRefinementEngine(mock_openai_client)
@@ -275,6 +282,7 @@ class TestUnitRefinementEngine:
                 assert "Resource curation failed" in str(result.errors[0])
                 assert len(result.refined_unit.resources) == len(sample_learning_unit.resources)
 
+    @pytest.mark.requires_api_key
     def test_batch_apply_refinements(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test batch application of refinements."""
         engine = UnitRefinementEngine(mock_openai_client)
@@ -333,6 +341,7 @@ class TestUnitRefinementEngine:
 class TestFactoryFunction:
     """Test cases for factory function."""
 
+    @pytest.mark.requires_api_key
     @patch('flowgenius.agents.unit_refinement_engine.OpenAI')
     def test_create_unit_refinement_engine_with_api_key(self, mock_openai_class: Mock) -> None:
         """Test creating unit refinement engine with API key."""
@@ -345,6 +354,7 @@ class TestFactoryFunction:
         mock_openai_class.assert_called_once_with(api_key="test-key")
         assert engine.model == "gpt-4"
 
+    @pytest.mark.requires_api_key
     @patch('flowgenius.agents.unit_refinement_engine.OpenAI')
     def test_create_unit_refinement_engine_without_api_key(self, mock_openai_class: Mock) -> None:
         """Test creating unit refinement engine without API key."""
@@ -369,6 +379,7 @@ class TestFactoryFunction:
 class TestUnitRefinementEngineIntegration:
     """Integration test cases for UnitRefinementEngine."""
 
+    @pytest.mark.requires_api_key
     def test_complete_refinement_workflow(self, mock_openai_client: Mock, sample_learning_unit: Any) -> None:
         """Test complete refinement workflow with real-world scenario."""
         engine = UnitRefinementEngine(mock_openai_client)

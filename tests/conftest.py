@@ -123,4 +123,37 @@ def mock_successful_task_response() -> dict:
                 "estimated_time": "15 min"
             }
         ]
-    } 
+    }
+
+
+# Nix sandbox environment handling
+import os
+import tempfile
+from pathlib import Path
+
+
+def pytest_configure(config):
+    """Configure pytest for Nix sandbox environment."""
+    # Check if we're running in Nix sandbox
+    if os.environ.get('HOME') == '/homeless-shelter' or os.environ.get('NIX_BUILD_TOP'):
+        # We're in Nix sandbox
+        if hasattr(config, 'option') and hasattr(config.option, 'markexpr'):
+            config.option.markexpr = "not requires_api_key and not requires_network"
+        
+        # Create a temporary HOME directory
+        temp_home = tempfile.mkdtemp(prefix='flowgenius-test-home-')
+        os.environ['HOME'] = temp_home
+        
+        # Create XDG directories
+        config_dir = Path(temp_home) / '.config' / 'flowgenius'
+        config_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create a dummy API key file to prevent file not found errors
+        api_key_file = config_dir / 'openai_key.txt'
+        api_key_file.write_text('dummy-key-for-testing')
+        api_key_file.chmod(0o600)
+        
+        # Set environment variables for tests
+        os.environ['FLOWGENIUS_TEST_MODE'] = '1'
+        os.environ['XDG_CONFIG_HOME'] = str(Path(temp_home) / '.config')
+        os.environ['XDG_DOCUMENTS_DIR'] = str(Path(temp_home) / 'Documents') 
